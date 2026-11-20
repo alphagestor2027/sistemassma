@@ -40,7 +40,7 @@ O esquema inicial está em `database/schema.sql` e as migrações de EPI em `sup
 
 ## Administração Master
 
-O Master inicial é o perfil existente de César. O acesso a `/adminmaster` exige autenticação. O painel consolida indicadores e permite filtrar por responsável e estado. Em **Gestão de técnicos** (`/adminmaster/tecnicos`), use **Cadastrar técnico** para criar uma conta com nome, usuário e senha inicial. Em **Gerenciar**, edite o nome, ative ou desative o acesso e salve as permissões por módulo. A criação de contas usa a Edge Function `ssma-create-technician` e o perfil é criado na mesma transação do Supabase Auth. Cada seção de EPI tem permissão própria. Novos perfis começam sem módulos liberados. Atribuições por regional e as políticas por proprietário continuam valendo dentro de cada módulo.
+O Master inicial é o perfil existente de César. O acesso a `/adminmaster` exige autenticação. O painel consolida indicadores e permite filtrar por responsável e estado. Em **Gestão de técnicos** (`/adminmaster/tecnicos`), use **Cadastrar técnico** para criar uma conta com nome, usuário e senha inicial. No cadastro ou na edição, selecione a região de atendimento e, se necessário, uma UF da região. Com a UF em branco, o atendimento abrange toda a região escolhida. Em **Gerenciar**, edite o nome, ative ou desative o acesso e salve as permissões por módulo. A criação de contas usa a Edge Function `ssma-create-technician` e o perfil é criado na mesma transação do Supabase Auth. Cada seção de EPI tem permissão própria. Novos perfis começam sem módulos liberados. Atribuições por regional e as políticas por proprietário continuam valendo dentro de cada módulo.
 
 ## Validação
 

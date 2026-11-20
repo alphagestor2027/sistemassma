@@ -37,6 +37,12 @@ export async function epiFixture() {
       'utf8',
     ),
   )
+  await pg.exec(
+    await readFile(
+      new URL('../supabase/migrations/20261120100116_atendimento_tecnico.sql', import.meta.url),
+      'utf8',
+    ),
+  )
   const call = (actor, name, body = {}) =>
     pg.transaction(async (tx) => {
       await tx.exec(actor ? 'set local role authenticated' : 'set local role anon')

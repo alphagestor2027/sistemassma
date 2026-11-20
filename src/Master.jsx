@@ -20,6 +20,41 @@ const grants = [
     .map((m) => [m.id, m.name]),
   ...Object.entries(epiSections).map(([name, key]) => ['epi.' + key, 'EPI · ' + name]),
 ]
+function ServiceAreaFields({ areas, person }) {
+  const [region, setRegion] = useState(person?.service_region || '')
+  const [state, setState] = useState(person?.service_state || '')
+  const regions = Object.keys(areas).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const states = (region ? areas[region] || [] : Object.values(areas).flat()).slice().sort()
+  return (
+    <>
+      <Select
+        label="Região de atendimento"
+        name="service_region"
+        placeholder="Não definida"
+        options={regions}
+        value={region}
+        onChange={(e) => {
+          const next = e.target.value
+          setRegion(next)
+          if (!areas[next]?.includes(state)) setState('')
+        }}
+      />
+      <Select
+        label="Estado de atendimento (opcional)"
+        name="service_state"
+        placeholder={region ? 'Toda a região' : 'Não definido'}
+        options={states}
+        value={state}
+        onChange={(e) => {
+          const next = e.target.value
+          setState(next)
+          if (next && !region) setRegion(regions.find((r) => areas[r].includes(next)))
+        }}
+      />
+    </>
+  )
+}
+
 function Permissions({ person, db, reload }) {
   const [chosen, setChosen] = useState(person.permissions),
     [busy, setBusy] = useState(false),
@@ -99,6 +134,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
   const people = data.people,
     projects = data.projects.filter((p) => !tech || p.tech === tech),
     selected = people.find((p) => p.id === edit)
+  const responsible = people.find((p) => p.id === tech)
   const rows = data.rows.filter((r) => (!tech || r.techs.includes(tech)) && (!uf || r.states.includes(uf)))
   const totals = indicators(rows, days)
   const percentage = (list) => {
@@ -142,9 +178,9 @@ export default function Master({ db, days, Trend, managing, navigate }) {
               <>
                 <ActionForm
                   submit="Criar conta do técnico"
-                  onSave={async ({ name, username, password }) => {
+                  onSave={async ({ name, username, password, service_region, service_state }) => {
                     const { data, error } = await db.functions.invoke('ssma-create-technician', {
-                      body: { name, username, password },
+                      body: { name, username, password, service_region, service_state },
                     })
                     if (error) {
                       const details = await error.context?.json?.().catch(() => null)
@@ -177,6 +213,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     minLength={8}
                     maxLength={72}
                   />
+                  <ServiceAreaFields areas={data.service_areas} />
                 </ActionForm>
                 <button className="text-button" onClick={() => setCreating(false)}>
                   Cancelar cadastro
@@ -184,12 +221,14 @@ export default function Master({ db, days, Trend, managing, navigate }) {
               </>
             )}
             <Table
-              headers={['Nome', 'Usuário', 'Acesso', 'Ações']}
+              headers={['Nome', 'Usuário', 'Região de atendimento', 'Estado', 'Acesso', 'Ações']}
               rows={people
                 .filter((p) => !p.master)
                 .map((p) => [
                   p.name,
                   p.username,
+                  p.service_region || 'Não definida',
+                  p.service_state || (p.service_region ? 'Toda a região' : '—'),
                   p.active ? 'Ativo' : 'Inativo',
                   <button
                     className="secondary"
@@ -209,7 +248,13 @@ export default function Master({ db, days, Trend, managing, navigate }) {
             <>
               <Panel title={'Cadastro de ' + selected.name}>
                 <ActionForm
-                  key={selected.id + selected.name + selected.active}
+                  key={JSON.stringify([
+                    selected.id,
+                    selected.name,
+                    selected.active,
+                    selected.service_region,
+                    selected.service_state,
+                  ])}
                   submit="Salvar cadastro"
                   onSave={async (p) => {
                     const { error } = await db.rpc('ssma_master', {
@@ -218,6 +263,10 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                         technician: selected.id,
                         name: p.name,
                         active: p.status === 'Ativo',
+                        service_region: p.service_region,
+                        service_state: p.service_state,
+                        previous_region: selected.service_region,
+                        previous_state: selected.service_state,
                         previous_name: selected.name,
                         previous_active: selected.active,
                       },
@@ -241,6 +290,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     options={['Ativo', 'Inativo']}
                     defaultValue={selected.active ? 'Ativo' : 'Inativo'}
                   />
+                  <ServiceAreaFields areas={data.service_areas} person={selected} />
                 </ActionForm>
               </Panel>
               <Panel title="Permissões por técnico">
@@ -279,6 +329,12 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                 onChange={(e) => setUf(e.target.value)}
               />
             </div>
+            {responsible?.service_region && (
+              <p className="epi-help">
+                Área de atendimento:{' '}
+                {[responsible.service_region, responsible.service_state].filter(Boolean).join(' · ')}
+              </p>
+            )}
             <div className="kpi-grid">
               {metrics.map(([label, I], i) => (
                 <div className="card kpi" key={label}>
