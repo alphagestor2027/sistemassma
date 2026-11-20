@@ -5,9 +5,23 @@ import { stamp, variant } from './epiData'
 import './epi.css'
 
 export default function EpiPortal({ db }) {
-  const [token, setToken] = useState(() => new URLSearchParams(location.hash.slice(1)).get('acesso') || '')
-  const [sessionReady, setReady] = useState(false),
-    [signed, setSigned] = useState('')
+  const [code, setCode] = useState('')
+  const [tracking, setTracking] = useState(null),
+    [trackingError, setTrackingError] = useState(''),
+    [checking, setChecking] = useState(false)
+  async function track(e) {
+    e.preventDefault()
+    setChecking(true)
+    setTrackingError('')
+    setTracking(null)
+    try {
+      setTracking(await rpc(db, 'portal', { action: 'track', p: { code } }))
+    } catch (err) {
+      setTrackingError(err.message)
+    } finally {
+      setChecking(false)
+    }
+  }
   const [employee, setEmployee] = useState(''),
     [state, setState] = useState(''),
     [names, setNames] = useState([]),
@@ -22,31 +36,12 @@ export default function EpiPortal({ db }) {
   const formKey = useRef(null),
     lock = useRef(false)
   useEffect(() => {
-    const { data } = db.auth.onAuthStateChange((_event, s) => {
-      setSigned(s?.user.id || '')
-      setReady(true)
-    })
-    return () => data.subscription.unsubscribe()
-  }, [db])
-  useEffect(() => {
     let active = true
-    if (!sessionReady) return
-    if (!token && !signed) {
-      setContext(null)
-      setNames([])
-      setStates([])
-      setEmployee('')
-      setState('')
-      setCounts({})
-      setMessage('')
-      setLoading(false)
-      return
-    }
     setError('')
     setLoading(true)
     setContext(null)
     const action = state ? 'context' : employee ? 'states' : 'names'
-    rpc(db, 'portal', { action, p: { token, employee_id: employee, state } })
+    rpc(db, 'portal', { action, p: { employee_id: employee, state } })
       .then((result) => {
         if (!active) return
         if (action === 'names') setNames(result)
@@ -62,18 +57,7 @@ export default function EpiPortal({ db }) {
     return () => {
       active = false
     }
-  }, [db, employee, state, token, refresh, signed, sessionReady])
-  function reset() {
-    setEmployee('')
-    setState('')
-    setContext(null)
-    setStates([])
-    setNames([])
-    setCounts({})
-    setMessage('')
-    setError('')
-    formKey.current = null
-  }
+  }, [db, employee, state, refresh])
   async function send(e) {
     e.preventDefault()
     if (lock.current) return
@@ -89,11 +73,12 @@ export default function EpiPortal({ db }) {
     try {
       const id = await rpc(db, 'portal', {
         action: 'submit',
-        p: { id: formKey.current, employee_id: employee, state, token, items },
+        p: { id: formKey.current, employee_id: employee, state, items },
       })
-      setMessage(
-        'Solicitação ' + id.slice(0, 8).toUpperCase() + ' registrada. Acompanhe a entrega no histórico.',
-      )
+      setMessage('Pedido recebido. Guarde seu código de rastreio: ' + id)
+      setCode(id)
+      setTracking(null)
+      setTrackingError('')
       formKey.current = null
       setCounts({})
       setRefresh((n) => n + 1)
@@ -125,65 +110,39 @@ export default function EpiPortal({ db }) {
           </div>
           <ClipboardList size={34} />
         </div>
-        {!token && !signed && sessionReady ? (
-          <Panel title="Acesso individual">
-            <form
-              className="epi-access"
-              onSubmit={(e) => {
-                e.preventDefault()
-                reset()
-                const code = new FormData(e.currentTarget).get('code').trim()
-                setToken(code)
-                history.replaceState(null, '', '#acesso=' + encodeURIComponent(code))
+        <Panel title="Identificação">
+          <div className="epi-fields">
+            <Select
+              label="Nome do colaborador"
+              value={employee}
+              disabled={busy || !names.length}
+              options={names.map((n) => [n.id, n.name])}
+              onChange={(e) => {
+                setEmployee(e.target.value)
+                setStates([])
+                setState('')
+                setContext(null)
+                setCounts({})
+                setMessage('')
+                formKey.current = null
               }}
-            >
-              <Field
-                label="Código de acesso"
-                name="code"
-                required
-                autoComplete="off"
-                placeholder="Código fornecido pelo responsável de SSMA"
-              />
-              <button className="primary">Acessar</button>
-            </form>
-          </Panel>
-        ) : (
-          <Panel title="Identificação">
-            <div className="epi-fields">
-              <Select
-                label="Nome do colaborador"
-                value={employee}
-                disabled={busy || !names.length}
-                options={names.map((n) => [n.id, n.name])}
-                onChange={(e) => {
-                  setEmployee(e.target.value)
-                  setStates([])
-                  setState('')
-                  setContext(null)
-                  setCounts({})
-                  setMessage('')
-                  formKey.current = null
-                }}
-              />
-              <Select
-                label="Estado"
-                value={state}
-                options={states}
-                disabled={busy || !employee || !states.length}
-                onChange={(e) => {
-                  setState(e.target.value)
-                  setContext(null)
-                  setCounts({})
-                  setMessage('')
-                  formKey.current = null
-                }}
-              />
-            </div>
-            {!loading && !error && sessionReady && !names.length && (
-              <p className="epi-empty">Nenhum colaborador ativo com regional vinculada para este acesso.</p>
-            )}
-          </Panel>
-        )}
+            />
+            <Select
+              label="Estado"
+              value={state}
+              options={states}
+              disabled={busy || !employee || !states.length}
+              onChange={(e) => {
+                setState(e.target.value)
+                setContext(null)
+                setCounts({})
+                setMessage('')
+                formKey.current = null
+              }}
+            />
+          </div>
+          <p className="epi-help">Se o seu nome não estiver na lista, entre em contato com o SSMA.</p>
+        </Panel>
         {loading && (
           <p role="status" className="notice">
             Consultando o estoque e os vínculos…
@@ -287,19 +246,47 @@ export default function EpiPortal({ db }) {
             </Panel>
           </>
         )}
-        {token && (
-          <button
-            className="text-button"
-            disabled={busy}
-            onClick={() => {
-              reset()
-              setToken('')
-              history.replaceState(null, '', location.pathname)
-            }}
-          >
-            Trocar código de acesso
-          </button>
-        )}
+        <Panel title="Acompanhar um pedido">
+          <form className="epi-access" onSubmit={track}>
+            <Field
+              label="Código de rastreio do pedido"
+              required
+              maxLength={64}
+              value={code}
+              disabled={checking}
+              onChange={(e) => {
+                setCode(e.target.value)
+                setTracking(null)
+                setTrackingError('')
+              }}
+              placeholder="EPI-…"
+            />
+            <button className="secondary" disabled={checking}>
+              {checking ? 'Consultando…' : 'Consultar andamento'}
+            </button>
+          </form>
+          {trackingError && (
+            <p role="alert" className="form-error">
+              {trackingError}
+            </p>
+          )}
+          {tracking && (
+            <div aria-live="polite">
+              <p className="epi-help">
+                Situação atual: <strong>{tracking.stage}</strong>
+              </p>
+              {tracking.postal && (
+                <p>
+                  Rastreamento dos Correios: <strong>{tracking.postal}</strong>
+                </p>
+              )}
+              <Table
+                headers={['Data', 'Andamento']}
+                rows={tracking.events.map((ev) => [stamp(ev.date), ev.stage])}
+              />
+            </div>
+          )}
+        </Panel>
       </main>
     </div>
   )

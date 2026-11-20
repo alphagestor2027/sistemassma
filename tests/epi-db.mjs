@@ -15,6 +15,7 @@ export async function epiFixture() {
     '../database/schema.sql',
     '../supabase/migrations/20261120010633_epi_operacao.sql',
     '../supabase/migrations/20261120011724_epi_estoque_centro.sql',
+    '../supabase/migrations/20261120013706_epi_portal_rastreio.sql',
   ]) {
     await pg.exec(await readFile(new URL(file, import.meta.url), 'utf8'))
   }

@@ -5,8 +5,7 @@ import { dateLabel, today } from './data'
 
 const numberProps = { type: 'number', min: 0, step: 1 }
 export function Regions({ data, employees, profile, save }) {
-  const [emp, setEmp] = useState(''),
-    [key, setKey] = useState('')
+  const [emp, setEmp] = useState('')
   const owned = data.regions.filter((r) => r.owner_id === profile.user_id)
   const active = employees.filter((e) => e.status === 'Ativo')
   const employee = active.find((e) => e.id === emp)
@@ -67,33 +66,6 @@ export function Regions({ data, employees, profile, save }) {
             a.contract || '—',
           ])}
         />
-      </Panel>
-      <Panel title="Acesso do colaborador">
-        <p className="epi-help">
-          O link abre a ficha de solicitação daquela pessoa. Gerar outro link substitui o anterior.
-        </p>
-        <ActionForm
-          submit="Gerar link individual"
-          onSave={async (p) => {
-            setKey('')
-            const token = await save('key', p)
-            setKey(location.origin + '/emissaoepi#acesso=' + token)
-          }}
-        >
-          <Select
-            name="employee_id"
-            label="Colaborador vinculado"
-            options={active
-              .filter((e) => data.assignments.some((a) => a.employee_id === e.id))
-              .map((e) => [e.id, e.title])}
-            required
-          />
-        </ActionForm>
-        {key && (
-          <Field label="Link para compartilhar com o colaborador">
-            <input readOnly value={key} onFocus={(e) => e.target.select()} />
-          </Field>
-        )}
       </Panel>
     </>
   )

@@ -3,6 +3,14 @@ import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { money, variant, regionLabel, expenseGroups, stamp, nextStatus } from './epiData'
 import { today, dateLabel } from './data'
 
+const stages = [
+  'Pedido recebido',
+  'Pedido separado',
+  'Aguardando aprovação do projeto',
+  'Pronto para retirada na base',
+  'Enviado pelos Correios',
+]
+
 export function Requests({ data, profile, save, refresh }) {
   const [status, setStatus] = useState(''),
     [region, setRegion] = useState('')
@@ -55,8 +63,40 @@ export function Requests({ data, profile, save, refresh }) {
             </header>
             <p>{q.items.map((i) => i.qty + ' × ' + variant(i)).join(', ')}</p>
             <small>
-              Pedido {q.id.slice(0, 8).toUpperCase()} · Técnico responsável: {reg?.technician || q.technician}
+              Rastreio {q.tracking_code} · Técnico responsável: {reg?.technician || q.technician}
             </small>
+            <p>
+              Andamento: <strong>{q.status === 'Solicitado' ? q.stage : q.status}</strong>
+              {q.postal && ' · Correios: ' + q.postal}
+            </p>
+            {q.status === 'Solicitado' && reg?.technician_id === profile.user_id && (
+              <ActionForm
+                key={q.stage + '|' + q.postal}
+                submit="Salvar andamento"
+                onSave={(p) =>
+                  save('progress', {
+                    ...p,
+                    request_id: q.id,
+                    previous_stage: q.stage,
+                    previous_postal: q.postal,
+                  })
+                }
+              >
+                <Select
+                  label="Etapa do pedido"
+                  name="stage"
+                  options={stages}
+                  defaultValue={q.stage}
+                  required
+                />
+                <Field
+                  label="Número de rastreamento dos Correios"
+                  name="postal"
+                  defaultValue={q.postal}
+                  maxLength={64}
+                />
+              </ActionForm>
+            )}
             {q.status === 'Solicitado' ? (
               <div className="epi-request-actions">
                 {reg?.technician_id === profile.user_id && (

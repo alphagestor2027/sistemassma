@@ -30,7 +30,7 @@ As porcentagens do painel representam a proporção de registros concluídos/ati
 
 ## Gestão de EPIs
 
-Em **Gestão de EPIs → Regionais e vínculos**, associe a regional ao login de um técnico autorizado e vincule cada colaborador ativo ao estado, projeto e cargo. O vínculo pode incluir centro de custo e contrato. Gere o link individual para acesso a `/emissaoepi`. Uma nova emissão de link substitui a anterior.
+Em **Gestão de EPIs → Regionais e vínculos**, associe a regional ao login de um técnico autorizado e vincule cada colaborador ativo ao estado, projeto e cargo. O vínculo pode incluir centro de custo e contrato. Em `/emissaoepi`, o colaborador escolhe nome e estado sem login. O pedido gera um código de rastreio para consultar o andamento e o número dos Correios informado pelo técnico em **Solicitações**.
 
 No estoque, cada registro representa uma variante de tamanho e cor em uma regional e, opcionalmente, em um centro de custo. O colaborador vê o estoque compartilhado da regional e o do seu centro de custo. O nome e o CA são obrigatórios, salvo quando a opção **Material sem CA** é marcada. O saldo inicial e as reposições geram entradas. O custo unitário segue a média ponderada do saldo físico e das novas entradas, arredondada a centavos. Um material sem regional pode ser vinculado posteriormente.
 

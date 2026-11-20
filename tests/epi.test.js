@@ -20,9 +20,8 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
       center: 'C01',
       contract: '123',
     })
-    const token = await manage(owner, 'key', { employee_id: employee }),
-      who = { token, employee_id: employee, state: 'DF' }
-    assert.equal((await portal('names', { token }))[0].name, 'Ana Silva')
+    const who = { employee_id: employee, state: 'DF' }
+    assert.equal((await portal('names', {}))[0].name, 'Ana Silva')
     assert.deepEqual(await portal('states', who), ['DF'])
     await assert.rejects(() => portal('context', { ...who, employee_id: randomUUID() }))
     await assert.rejects(() => call(null, 'ssma_epi_workspace'))
@@ -69,8 +68,33 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
       [mat],
     )
     const request = { ...who, id: randomUUID(), items: [{ id: mat, qty: 2 }] }
-    await portal('submit', request)
-    await portal('submit', request)
+    const code = await portal('submit', request)
+    assert.match(code, /^EPI-[0-9A-F]{16}$/)
+    assert.equal(await portal('submit', request), code)
+    let stage = 'Pedido recebido',
+      postal = ''
+    assert.equal((await portal('track', { code })).stage, stage)
+    for (const next of [
+      'Pedido separado',
+      'Aguardando aprovação do projeto',
+      'Pronto para retirada na base',
+      'Enviado pelos Correios',
+    ]) {
+      const update = {
+        request_id: request.id,
+        stage: next,
+        previous_stage: stage,
+        previous_postal: postal,
+        postal: next === 'Enviado pelos Correios' ? 'AA123456789BR' : '',
+      }
+      await assert.rejects(() => manage(owner, 'progress', update))
+      await manage(tech, 'progress', update)
+      stage = next
+      postal = update.postal
+      const tracked = await portal('track', { code })
+      assert.equal(tracked.stage, stage)
+      assert.equal(tracked.postal, postal)
+    }
     await assert.rejects(() =>
       portal('submit', { ...request, id: randomUUID(), items: [{ id: mat, qty: 7 }] }),
     )
@@ -120,8 +144,9 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
     assert.equal(data.assets[0].history.length, 7)
     await assert.rejects(() => manage(tech, 'test', { asset_id: asset, status: 'Em uso' }))
     assert.equal((await portal('context', who)).history.length, 3)
-    await manage(owner, 'key', { employee_id: employee })
-    await assert.rejects(() => portal('names', { token }))
+    assert.equal((await portal('track', { code })).stage, 'Entregue')
+    assert.equal((await portal('track', { code })).events.length, 6)
+    await assert.rejects(() => portal('track', { code: 'inexistente' }))
   } finally {
     await pg.close()
   }
