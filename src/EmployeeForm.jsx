@@ -1,4 +1,4 @@
-import React, { useState } from 'react'
+import React, { useEffect, useState } from 'react'
 import { regionOf } from './epiData'
 import { today } from './data'
 
@@ -32,6 +32,7 @@ export function employeePayload(form, record, owner) {
   const details = {
     ...record.details,
     admission: value('admission'),
+    technicianId: value('technicianId') || null,
     extra: value('extra'),
     region: regionOf(value('employee_state')),
   }
@@ -62,7 +63,53 @@ export function employeePayload(form, record, owner) {
   }
 }
 
-export function EmployeeFields({ record, coverage }) {
+function TechnicianSelect({ db, record }) {
+  const [people, setPeople] = useState([])
+  const [state, setState] = useState('loading')
+  const [attempt, setAttempt] = useState(0)
+  const [choice, setChoice] = useState(null)
+  useEffect(() => {
+    let current = true
+    async function loadDirectory() {
+      setState('loading')
+      try {
+        const { data, error } = await db.rpc('ssma_employee_technicians')
+        if (error || !Array.isArray(data)) throw Error()
+        if (current) { setPeople(data); setState('ready') }
+      } catch {
+        if (current) setState('error')
+      }
+    }
+    loadDirectory()
+    return () => { current = false }
+  }, [db, attempt])
+
+  const previousId = record.details?.technicianId || ''
+  const matches = people.filter(person => previousId ? person.id === previousId : person.name === record.person)
+  const historical = Boolean(record.person || previousId) && matches.length !== 1
+  const selected = choice ?? (historical ? 'previous' : matches[0]?.id || '')
+  const technician = people.find(person => person.id === selected)
+  const name = selected === 'previous' ? record.person : technician?.name
+  const id = selected === 'previous' ? previousId : technician?.id
+  return (
+    <div>
+      <label>Técnico de segurança responsável
+        <select aria-label="Técnico de segurança responsável" value={selected} disabled={state !== 'ready'}
+          onChange={event => setChoice(event.target.value)}>
+          <option value="">{state === 'loading' ? 'Carregando técnicos…' : 'Sem responsável'}</option>
+          {historical && <option value="previous">{record.person || 'Responsável anterior'} · cadastro anterior</option>}
+          {people.map(person => <option key={person.id} value={person.id}>{person.name}</option>)}
+        </select>
+      </label>
+      <input type="hidden" name="person" value={name || ''} />
+      <input type="hidden" name="technicianId" value={id || ''} />
+      {state === 'ready' && !people.length && <small>Nenhum técnico ativo cadastrado.</small>}
+      {state === 'error' && <small role="alert">Falha ao carregar os técnicos. <button type="button" className="text-button" onClick={() => setAttempt(attempt + 1)}>Tentar novamente</button></small>}
+    </div>
+  )
+}
+
+export function EmployeeFields({ record, coverage, db }) {
   const details = record.details || {}
   const [uf, setUf] = useState(record.employee_state || '')
   const [cpf, setCpf] = useState(formatCpf(details.cpf || ''))
@@ -129,10 +176,7 @@ export function EmployeeFields({ record, coverage }) {
           Região
           <input readOnly value={regionOf(uf)} placeholder="Selecione a UF" />
         </label>
-        <label>
-          Técnico de segurança responsável
-          <input name="person" defaultValue={record.person} maxLength={200} />
-        </label>
+        <TechnicianSelect db={db} record={record} />
         <label>
           Projeto
           <input name="unit" defaultValue={record.unit} maxLength={120} required />
