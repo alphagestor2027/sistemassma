@@ -1,7 +1,7 @@
 import test from 'node:test'
 import assert from 'node:assert/strict'
 import { randomUUID } from 'node:crypto'
-import { epiFixture } from './epi-db.mjs'
+import { epiFixture, applyDistributionUnits } from './epi-db.mjs'
 import { forecast, expenseGroups } from '../src/epiData.js'
 
 test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreSQL', async () => {
@@ -198,6 +198,46 @@ test('estoque regional, custo e validade do lote de luvas', async () => {
     assert.equal((await summary())[0].qty, 0)
     await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
     assert.equal((await call(owner, 'ssma_epi_glove_summary', {})).find((r) => r.state === 'DF').qty, 2)
+  } finally {
+    await pg.close()
+  }
+})
+
+test('unidades distribuem pelo projeto sem alterar a UF ou as reservas anteriores', async () => {
+  const { pg, owner, tech, employee, call } = await epiFixture()
+  const manage = (actor, action, p) => call(actor, 'ssma_epi_manage', {action, p})
+  const portal = (action, p) => call(null, 'ssma_epi_portal', {action, p})
+  try {
+    await pg.query('update public.ssma_profiles set is_master=true where user_id=$1',[owner])
+    const legacy = randomUUID()
+    await manage(owner,'material',{id:legacy,name:'Uniforme',no_ca:true,qty:2})
+    await applyDistributionUnits(pg)
+    const workspace = await call(owner,'ssma_epi_workspace')
+    const units = Object.fromEntries(workspace.regions.map(r => [r.distribution_unit,r.id]))
+    assert.deepEqual(Object.keys(units).sort(),['DF','MATRIZ','RJ'])
+    assert.equal(workspace.materials[0].region_id,null)
+    const routing = region_id => ({project:'Projeto Norte',region_id})
+    await assert.rejects(manage(tech,'project_unit',routing(units.MATRIZ)),/Master/)
+    await assert.rejects(manage(owner,'material',{id:randomUUID(),name:'Sem unidade',no_ca:true,region_state:'SP'}),/unidade/)
+    await manage(owner,'allocate',{material_id:legacy,region_id:units.MATRIZ})
+    const other = randomUUID()
+    await manage(owner,'material',{id:other,name:'Capacete',no_ca:true,qty:4,region_id:units.RJ})
+    await manage(owner,'project_unit',routing(units.MATRIZ))
+    const person = {employee_id:employee,state:'DF'}
+    assert.deepEqual(await portal('states',person),['DF'])
+    assert.deepEqual((await portal('context',person)).materials.map(m=>m.id),[legacy])
+    const order = id => ({...person,id:randomUUID(),items:[{id,qty:1}]})
+    await assert.rejects(portal('submit',order(other)),/indisponível/)
+    await portal('submit',order(legacy))
+    await manage(owner,'project_unit',routing(units.RJ))
+    assert.deepEqual((await portal('context',person)).materials.map(m=>m.id),[other])
+    assert.deepEqual(await portal('states',person),['DF'])
+    const after = await call(owner,'ssma_epi_workspace')
+    assert.equal(after.requests[0].region_id, units.MATRIZ)
+    assert.equal(after.materials.find(m=>m.id===legacy).reserved,1)
+    const newcomer = randomUUID()
+    await pg.query("insert into public.ssma_records(id,owner_id,module,title,unit,employee_state,status) values($1,$2,'colaboradores','Colaborador novo','PROJETO NORTE','SP','Ativo')",[newcomer,tech])
+    assert.equal((await portal('context',{employee_id:newcomer,state:'SP'})).region,'RJ')
   } finally {
     await pg.close()
   }

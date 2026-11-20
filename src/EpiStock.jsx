@@ -2,7 +2,7 @@ import { GloveIndicators } from './EpiIndicators'
 import React, { useState } from 'react'
 import { CaExpiryEditor, CaResult, useCaLookup } from './CaCatalog'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
-import { available, variant, regionLabel, states, forecast, money, stockAreas, after365 } from './epiData'
+import { available, variant, regionLabel, forecast, money, after365 } from './epiData'
 import { dateLabel, today } from './data'
 
 function PriceField({ label, placeholder }) {
@@ -39,22 +39,29 @@ function PriceField({ label, placeholder }) {
 const numberProps = { type: 'number', min: 0, step: 1 }
 export function Regions({ data, employees, profile, save }) {
   const [emp, setEmp] = useState('')
-  const owned = data.regions.filter((r) => r.owner_id === profile.user_id)
-  const active = employees.filter((e) => e.status === 'Ativo')
-  const employee = active.find((e) => e.id === emp)
+  const units = data.regions.filter(r => r.distribution_unit)
+  const options = units.map(r => [r.id, r.distribution_unit])
+  const projects = data.projects || []
+  const active = employees.filter(e => e.status === 'Ativo' && data.assignments.some(a => a.employee_id === e.id))
+  const assignment = data.assignments.find(a => a.employee_id === emp)
   return (
     <>
-      <Panel title="Regionais e técnicos responsáveis">
-        <ActionForm submit="Salvar regional" onSave={(p) => save('region', p)}>
-          <Select label="Estado" name="state" options={states} required />
-          <Field label="Nome da regional" name="name" required maxLength={150} />
-          <Field label="Login do técnico no SSMA" name="login" defaultValue={profile.username} required />
-        </ActionForm>
-        <Table
-          headers={['Estado', 'Regional', 'Técnico responsável', 'Login']}
-          rows={data.regions.map((r) => [r.state, r.name, r.technician, r.technician_login])}
-        />
+      <Panel title="Unidades de distribuição">
+        <Table headers={['Unidade', 'Responsável']} rows={units.map(r => [r.distribution_unit, r.technician])} />
+        {profile.is_master && <ActionForm submit="Salvar responsável" onSave={p => save('region', p)}>
+          <Select label="Unidade de distribuição" name="region_id" options={options} required />
+          <Field label="Login do responsável no SSMA" name="login" required />
+        </ActionForm>}
       </Panel>
+      {profile.is_master && <Panel title="Unidade de distribuição por projeto">
+        <ActionForm submit="Salvar unidade do projeto" onSave={p => save('project_unit', p)}>
+          <Select label="Projeto" name="project" options={projects.map(p => p.project)} required />
+          <Select label="Unidade que atende o projeto" name="region_id" options={options} required />
+        </ActionForm>
+        <Table headers={['Projeto', 'Unidade de distribuição']} rows={projects.map(p =>
+          [p.project, units.find(r => r.id === p.region_id)?.distribution_unit || 'A definir'])}
+          empty="Cadastre um colaborador com projeto para definir a unidade de distribuição." />
+      </Panel>}
       <Panel title="Vínculos dos colaboradores">
         <ActionForm submit="Salvar vínculo" onSave={(p) => save('assignment', p)} onDone={() => setEmp('')}>
           <Select
@@ -65,31 +72,14 @@ export function Regions({ data, employees, profile, save }) {
             onChange={(e) => setEmp(e.target.value)}
             required
           />
-          <Select
-            label="Regional do colaborador"
-            name="region_id"
-            options={owned.map((r) => [r.id, regionLabel(r)])}
-            required
-          />
-          <Field
-            key={'project' + emp}
-            label="Nome do projeto / unidade"
-            name="project"
-            defaultValue={employee?.unit || ''}
-            required
-          />
-          <Field
-            key={'job' + emp}
-            label="Cargo"
-            name="job"
-            defaultValue={employee?.details?.extra || ''}
-            required
-          />
-          <Field label="Centro de custo" name="center" />
-          <Field label="Contrato" name="contract" />
+          <input type="hidden" name="region_id" value={assignment?.region_id || ''} />
+          <Field label="Projeto" value={assignment?.project || ''} readOnly />
+          <Field label="Unidade de distribuição" value={regionLabel(data.regions.find(r => r.id === assignment?.region_id))} readOnly />
+          <Field key={'center'+emp} label="Centro de custo" name="center" defaultValue={assignment?.center || ''} />
+          <Field key={'contract'+emp} label="Contrato" name="contract" defaultValue={assignment?.contract || ''} />
         </ActionForm>
         <Table
-          headers={['Colaborador', 'Regional', 'Projeto', 'Cargo', 'Centro de custo', 'Contrato']}
+          headers={['Colaborador', 'Unidade', 'Projeto', 'Cargo', 'Centro de custo', 'Contrato']}
           rows={data.assignments.map((a) => [
             a.employee || employees.find((e) => e.id === a.employee_id)?.title,
             regionLabel(data.regions.find((r) => r.id === a.region_id)),
@@ -130,25 +120,11 @@ export function Stock({ db, data, profile, save }) {
     changeCa('')
     setName(null)
   }
-  const coverage = profile.is_master ? states : profile.coverage || []
-  const regionalOptions = Object.entries(stockAreas).flatMap(([area, ufs]) =>
-    ufs
-      .split(' ')
-      .filter((uf) => coverage.includes(uf))
-      .flatMap((uf) => {
-        const existing = data.regions.filter((r) => r.state === uf)
-        return existing.length
-          ? existing.map((r) => [r.id, area + ' · ' + regionLabel(r)])
-          : [['uf:' + uf, area + ' · ' + uf]]
-      }),
-  )
+  const regionalOptions = data.regions.filter(r => r.distribution_unit).map(r => [r.id, r.distribution_unit])
   const [start, setStart] = useState(''),
     [manualGlove, setManualGlove] = useState(false)
   const detected = /luva.*isolante/i.test(name || '') || /luva.*isolante/i.test(suggested)
   const glove = detected || manualGlove
-  function regionalPayload(p) {
-    return p.region_id?.startsWith('uf:') ? { ...p, region_id: '', region_state: p.region_id.slice(3) } : p
-  }
   const materialOptions = data.materials.map((m) => [
     m.id,
     variant(m) + ' · ' + regionLabel(data.regions.find((r) => r.id === m.region_id)),
@@ -209,7 +185,7 @@ export function Stock({ db, data, profile, save }) {
             submit="Salvar material"
             onSave={(p) =>
               save('material', {
-                ...regionalPayload(p),
+                ...p,
                 insulating_glove: glove,
                 glove_start: glove ? start : null,
                 no_ca: noCA,
@@ -302,10 +278,11 @@ export function Stock({ db, data, profile, save }) {
               ]}
             />
             <Select
-              label="Estoque regional"
+              label="Unidade de distribuição"
               name="region_id"
               options={regionalOptions}
-              placeholder="Selecione a regional"
+              placeholder="Selecione a unidade"
+              required
             />
           </ActionForm>
         )}
@@ -330,8 +307,8 @@ export function Stock({ db, data, profile, save }) {
             label="Filtrar estoque"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
-            placeholder="Todas as regionais"
-            options={[['none', 'Sem regional'], ...data.regions.map((r) => [r.id, regionLabel(r)])]}
+            placeholder="Todas as unidades"
+            options={[['none', 'Sem unidade'], ...data.regions.map((r) => [r.id, regionLabel(r)])]}
           />
         </div>
         {stockCa && (
@@ -351,7 +328,7 @@ export function Stock({ db, data, profile, save }) {
           headers={[
             'Material / grade',
             'CA',
-            'Regional',
+            'Unidade de distribuição',
 
             'Físico',
             'Reservado',
@@ -363,12 +340,12 @@ export function Stock({ db, data, profile, save }) {
           rows={materials.map((m) => [
             variant(m),
             m.no_ca ? <span className="badge red">Sem CA</span> : m.ca,
-            !m.region_id && m.owner_id === profile.user_id ? (
+            !m.region_id && (profile.is_master || m.owner_id === profile.user_id) ? (
               <ActionForm
-                submit="Definir regional"
-                onSave={(p) => save('allocate', regionalPayload({ ...p, material_id: m.id }))}
+                submit="Definir unidade"
+                onSave={(p) => save('allocate', { ...p, material_id: m.id })}
               >
-                <Select label="Regional do material" name="region_id" options={regionalOptions} required />
+                <Select label="Unidade do material" name="region_id" options={regionalOptions} required />
               </ActionForm>
             ) : (
               regionLabel(data.regions.find((r) => r.id === m.region_id))

@@ -168,7 +168,7 @@ export default function EpiPortal({ db }) {
                 ['Projeto', context.project],
                 ['Cargo', context.job],
                 ['Técnico de segurança', context.technician],
-                ['Regional', context.region],
+                ['Unidade de distribuição', context.region],
               ].map(([label, v]) => (
                 <div key={label}>
                   <small>{label}</small>
@@ -231,7 +231,7 @@ export default function EpiPortal({ db }) {
                   </div>
                 </form>
               ) : (
-                <p className="epi-empty">Não há material disponível no estoque desta regional.</p>
+                <p className="epi-empty">Não há material disponível no estoque desta unidade.</p>
               )}
             </Panel>
             <Panel title="Histórico de solicitações">

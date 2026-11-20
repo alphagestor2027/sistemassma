@@ -11,7 +11,7 @@ export const stamp = (value) =>
     timeStyle: 'short',
   })
 export const variant = (m) => [m.name, m.size && 'Tam. ' + m.size, m.color].filter(Boolean).join(' · ')
-export const regionLabel = (r) => (r ? [r.state, r.name, r.technician].join(' · ') : 'Sem regional')
+export const regionLabel = (r) => (r ? r.distribution_unit || [r.state, r.name, r.technician].join(' · ') : 'Sem unidade')
 export const available = (m, date = today()) =>
   m.insulating_glove && (!m.glove_start || m.glove_start > date)
     ? 0

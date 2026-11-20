@@ -1,5 +1,5 @@
 import { PGlite } from '@electric-sql/pglite'
-import { readFile } from 'node:fs/promises'
+import { readFile, readdir } from 'node:fs/promises'
 import { randomUUID } from 'node:crypto'
 
 export async function epiFixture() {
@@ -96,4 +96,9 @@ export async function epiFixture() {
       ).rows[0].result
     })
   return { pg, owner, tech, employee, call }
+}
+export async function applyDistributionUnits(pg) {
+  const dir = new URL('../supabase/migrations/', import.meta.url)
+  const name = (await readdir(dir)).find(file => file.endsWith('_unidades_distribuicao_projeto.sql'))
+  await pg.exec(await readFile(new URL(name, dir), 'utf8'))
 }

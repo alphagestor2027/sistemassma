@@ -21,7 +21,7 @@ export function GloveIndicators({ db, technician = '', region = '', uf = '', rev
   }, [db, technician, revision])
   const groups = new Map()
   for (const item of rows.filter((r) => (!region || r.region === region) && (!uf || r.state === uf))) {
-    const key = uf ? item.region + ' · ' + uf : item.region
+    const key = item.unit || (uf ? item.region + ' · ' + uf : item.region)
     const g = groups.get(key) || [key, 0, 0, 0]
     g[1] += item.qty
     g[2] += item.available
@@ -33,7 +33,7 @@ export function GloveIndicators({ db, technician = '', region = '', uf = '', rev
     [0, 0, 0],
   )
   return (
-    <Panel title="Luvas isolantes em estoque por região">
+    <Panel title="Luvas isolantes por unidade de distribuição">
       {!err && groups.size > 0 && (
         <p className="epi-help">
           Total de {totals[0]} luvas · {totals[1]} disponíveis · {money(totals[2] / 100)} em estoque.
@@ -43,7 +43,7 @@ export function GloveIndicators({ db, technician = '', region = '', uf = '', rev
         <p role="alert">{err}</p>
       ) : (
         <Table
-          headers={['Região', 'Quantidade física', 'Disponíveis', 'Custo do estoque SSMA']}
+          headers={['Unidade', 'Quantidade física', 'Disponíveis', 'Custo do estoque SSMA']}
           rows={[...groups.values()].map(([k, q, a, c]) => [k, q, a, money(c / 100)])}
           empty="Nenhuma regional para esta seleção."
         />

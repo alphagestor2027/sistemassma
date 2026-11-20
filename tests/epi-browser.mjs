@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { epiFixture } from './epi-db.mjs'
+import { epiFixture, applyDistributionUnits } from './epi-db.mjs'
 
 const { pg, owner, tech, employee, call } = await epiFixture()
 const installed = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
@@ -81,6 +81,7 @@ async function client(actor) {
 }
 try {
   await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
+  await applyDistributionUnits(pg)
   const admin = await client(owner)
   admin.on('pageerror', (e) => console.error(e.message))
   await admin.goto(base)
@@ -90,14 +91,10 @@ try {
   const button = (p, name) => p.getByRole('button', { name, exact: true })
   await button(admin, 'Gestão de EPIs').click()
   await button(admin, 'Regionais e vínculos').click()
-  await admin.getByLabel('Estado', { exact: true }).selectOption('DF')
-  await admin.getByLabel('Nome da regional').fill('Brasília')
-  await button(admin, 'Salvar regional').click()
-  await admin.getByRole('cell', { name: 'Brasília', exact: true }).waitFor()
-  await admin.getByLabel('Colaborador', { exact: true }).selectOption(employee)
-  await admin.getByLabel('Regional do colaborador').selectOption({ index: 1 })
-  await button(admin, 'Salvar vínculo').click()
-  await admin.getByRole('cell', { name: 'Ana Silva', exact: true }).waitFor()
+  await admin.getByLabel('Projeto',{exact:true}).filter({visible:true}).first().selectOption('Projeto Norte')
+  await admin.getByLabel('Unidade que atende o projeto').selectOption({label:'MATRIZ'})
+  await button(admin,'Salvar unidade do projeto').click()
+  await admin.getByRole('cell',{name:'Ana Silva',exact:true}).waitFor()
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()
   await pg.query("insert into ssma_epi.ca_catalog(ca,fichas) values ('111',$1)", [
@@ -137,11 +134,9 @@ try {
   await admin.getByText(/Vencimento da luva:/).waitFor()
   assert.equal(await admin.getByLabel('Centro de custo do estoque').count(), 0)
   assert.match(await admin.getByLabel('Valor unitário (R$)', { exact: true }).inputValue(), /30,00/)
-  assert.ok(
-    await admin.getByLabel('Estoque regional').locator('option').filter({ hasText: 'Sul · PR' }).count(),
-  )
+  assert.deepEqual((await admin.getByLabel('Unidade de distribuição',{exact:true}).locator('option').allTextContents()).slice(1).sort(),['DF','MATRIZ','RJ'])
   await admin.getByLabel('Tamanho / numeração').fill('M')
-  await admin.getByLabel('Estoque regional').selectOption({ index: 1 })
+  await admin.getByLabel('Unidade de distribuição',{exact:true}).selectOption({ label: 'MATRIZ' })
   await button(admin, 'Salvar material').click()
   await admin.getByRole('cell', { name: 'Luva isolante · Tam. M', exact: true }).waitFor()
   await button(admin, 'Consultar CA').click()
