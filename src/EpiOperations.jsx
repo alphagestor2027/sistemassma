@@ -1,4 +1,3 @@
-import { ReplacementAlert } from './EpiIndicators'
 import React, { useState } from 'react'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { money, variant, regionLabel, expenseGroups, stamp, nextStatus } from './epiData'
@@ -255,71 +254,6 @@ export function Finance({ data }) {
           ])}
         />
       </Panel>
-    </>
-  )
-}
-
-export function Sheet({ data, employees }) {
-  const [id, setId] = useState('')
-  const names = new Map(employees.map((e) => [e.id, e.title]))
-  for (const q of [...data.requests].reverse())
-    if (!names.has(q.employee_id)) names.set(q.employee_id, q.employee)
-  const delivered = data.requests
-    .filter((q) => q.employee_id === id && q.status === 'Entregue')
-    .sort((a, b) => b.closed_at.localeCompare(a.closed_at))
-  return (
-    <>
-      <Panel title="Ficha de EPI digital">
-        <div className="epi-filters">
-          <Select
-            label="Consultar colaborador"
-            value={id}
-            options={[...names].sort((a, b) => a[1].localeCompare(b[1]))}
-            onChange={(e) => setId(e.target.value)}
-          />
-          {id && (
-            <button className="secondary" onClick={() => window.print()}>
-              Imprimir ficha / salvar PDF
-            </button>
-          )}
-        </div>
-      </Panel>
-      {id && (
-        <section className="card epi-panel epi-print">
-          <header>
-            <div>
-              <p className="eyebrow">Sistema SSMA 2.0</p>
-              <h2>Ficha individual de entrega de EPI</h2>
-            </div>
-          </header>
-          <h3>{names.get(id)}</h3>
-          <ReplacementAlert requests={delivered} />
-          <p className="epi-help">Emissão em {dateLabel(today())}</p>
-          <Table
-            headers={[
-              'Entrega',
-              'Projeto / cargo',
-              'Material',
-              'CA',
-              'Quantidade',
-              'Técnico que confirmou',
-              'Pedido',
-            ]}
-            rows={delivered.flatMap((q) =>
-              q.items.map((i) => [
-                stamp(q.closed_at),
-                q.project + ' / ' + q.state + ' · ' + q.job,
-                variant(i),
-                i.ca || 'Sem CA',
-                i.qty,
-                q.confirmed_name,
-                q.id.slice(0, 8).toUpperCase(),
-              ]),
-            )}
-            empty="Nenhuma entrega confirmada para este colaborador."
-          />
-        </section>
-      )}
     </>
   )
 }

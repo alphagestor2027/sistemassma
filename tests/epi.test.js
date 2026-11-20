@@ -278,3 +278,23 @@ test('edição e exclusão preservam o histórico, as reservas e as permissões 
     await pg.close()
   }
 })
+
+test('ficha emitida conserva o cadastro, limita alterações por área e preserva as entregas', async () => {
+  const {pg,owner,tech,employee,call}=await epiFixture()
+  const sheet=(actor,action,p={})=>call(actor,'ssma_epi_sheet',{action,p:{employee_id:employee,...p}})
+  try {
+    await pg.query('update public.ssma_profiles set is_master=true where user_id=$1',[owner])
+    await applyDistributionUnits(pg)
+    const preview=await sheet(owner,'context')
+    const id=randomUUID(), settings={identity:{name:'Ana Silva'},legal:'Texto legal',term:'Termo',logo:'',place:'',reasons:{}}
+    const doc=await sheet(owner,'issue',{id,version:preview.version,settings})
+    await pg.query("update public.ssma_records set unit='Outro projeto' where id=$1",[employee])
+    assert.equal((await sheet(owner,'open',{id})).snapshot.unit,'Projeto Norte')
+    await assert.rejects(sheet(null,'open',{id}))
+    await assert.rejects(sheet(tech,'edit',{id,revision:1,settings}))
+    await sheet(owner,'edit',{id,revision:doc.revision,settings:{...settings,term:'Revisado'}})
+    await assert.rejects(sheet(owner,'delete',{id,revision:1}),/alterada/)
+    await sheet(owner,'delete',{id,revision:2})
+    assert.deepEqual((await sheet(owner,'context')).sheets,[])
+  } finally { await pg.close() }
+})

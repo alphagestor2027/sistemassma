@@ -35,7 +35,7 @@ await page.getByRole('button',{name:'Novo colaborador',exact:true}).first().clic
 const employeeDialog=page.getByRole('dialog')
 await employeeDialog.getByLabel('Colaborador',{exact:true}).fill('Funcionária de teste')
 await employeeDialog.getByLabel('Data de admissão').fill('2026-09-01')
-for(const [label,value] of Object.entries({'Cargo':'Eletricista','Matrícula':'00045','CPF':'00000000000','E-mail':'teste@example.com','Empresa':'Empresa de teste','Coordenador':'Coordenação A','Gerência':'Gerência A','Projeto':'Projeto A'})){
+for(const [label,value] of Object.entries({'Cargo':'Eletricista','Matrícula':'00045','CPF':'00000000000','E-mail':'teste@example.com','Empresa':'Empresa de teste','Setor':'Operações','CNPJ':'00.000.000/0000-00','Coordenador':'Coordenação A','Gerência':'Gerência A','Projeto':'Projeto A'})){
   await employeeDialog.getByLabel(label,{exact:true}).fill(value)
 }
 await employeeDialog.getByRole('combobox',{name:'Técnico de segurança responsável'}).selectOption({label:'Técnico de teste'})
@@ -49,6 +49,8 @@ for(const label of ['NR 06','NR 10 Básica','SEP','NR 12','NR 18','NR 20']){
 await employeeDialog.getByRole('button',{name:'Salvar registro'}).click()
 await page.getByRole('button',{name:'Editar Funcionária de teste'}).click()
 assert.equal(await employeeDialog.getByLabel('Matrícula').inputValue(),'00045')
+assert.equal(await employeeDialog.getByLabel('Setor',{exact:true}).inputValue(),'Operações')
+assert.equal(await employeeDialog.getByLabel('CNPJ',{exact:true}).inputValue(),'00.000.000/0000-00')
 assert.equal(await employeeDialog.getByLabel('CPF').inputValue(),'000.000.000-00')
 assert.equal(await employeeDialog.getByLabel('Observações · NR 20').inputValue(),'Observação NR 20')
 await employeeDialog.getByLabel('Desligado').check()

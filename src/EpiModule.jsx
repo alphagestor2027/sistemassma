@@ -11,7 +11,8 @@ import {
   ExternalLink,
 } from 'lucide-react'
 import { Stock, Regions, Planning } from './EpiStock'
-import { Requests, Finance, Sheet, Tests } from './EpiOperations'
+import { Sheet } from './EpiSheet'
+import { Requests, Finance, Tests } from './EpiOperations'
 import { rpc } from './EpiShared'
 import './epi.css'
 import { epiSections, permitted } from './access'
@@ -113,7 +114,7 @@ export default function EpiModule({ db, profile, employees, children, initialTab
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
             {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
             {tab === 'Financeiro' && <Finance {...props} />}
-            {tab === 'Ficha digital' && <Sheet {...props} />}{' '}
+            {tab === 'Ficha digital' && <Sheet {...props} db={db} />}{' '}
             {tab === 'Ensaios e retornos' && <Tests {...props} />}{' '}
             {tab === 'Previsão de compras' && <Planning {...props} />}
             {tab === 'Regionais e vínculos' && <Regions {...props} />}

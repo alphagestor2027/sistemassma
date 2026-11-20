@@ -15,6 +15,8 @@ const contactFields = [
   ['cpf', 'CPF'],
   ['email', 'E-mail'],
   ['company', 'Empresa'],
+  ['cnpj', 'CNPJ'],
+  ['sector', 'Setor'],
   ['coordinator', 'Coordenador'],
   ['management', 'Gerência'],
 ]

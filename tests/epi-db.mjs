@@ -85,7 +85,7 @@ export async function epiFixture() {
           .records
       if (name === 'ssma_epi_dashboard')
         return (await tx.query('select * from public.ssma_epi_dashboard()')).rows
-      if (!['ssma_epi_workspace', 'ssma_epi_manage', 'ssma_epi_portal', 'ssma_master'].includes(name))
+      if (!['ssma_epi_workspace', 'ssma_epi_manage', 'ssma_epi_portal', 'ssma_epi_sheet', 'ssma_master'].includes(name))
         throw Error('RPC desconhecida')
       const args = name === 'ssma_epi_workspace' ? [] : [body.action, JSON.stringify(body.p)]
       return (
@@ -100,7 +100,7 @@ export async function epiFixture() {
 export async function applyDistributionUnits(pg) {
   const dir = new URL('../supabase/migrations/', import.meta.url)
   const files = await readdir(dir)
-  for (const suffix of ['_unidades_distribuicao_projeto.sql', '_manutencao_materiais_estoque.sql', '_numeros_luvas_por_mao.sql']) {
+  for (const suffix of ['_unidades_distribuicao_projeto.sql', '_manutencao_materiais_estoque.sql', '_numeros_luvas_por_mao.sql', '_fichas_epi_emitidas.sql']) {
     const name = files.find(file => file.endsWith(suffix))
     await pg.exec(await readFile(new URL(name, dir), 'utf8'))
   }
