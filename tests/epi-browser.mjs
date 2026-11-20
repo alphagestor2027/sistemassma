@@ -37,13 +37,13 @@ async function client(actor) {
       let body
       if (name === 'ssma-create-technician') {
         await call(actor, 'ssma_master', { action: 'authorize_creation', p: {} })
-        const { name: displayName, username, service_region, service_state } = req.postDataJSON()
+        const { name: displayName, username, coverage } = req.postDataJSON()
         const id = crypto.randomUUID()
         await pg.transaction(async (tx) => {
           await tx.query('insert into auth.users(id,email) values($1,$2)', [id, username + '@ssma.invalid'])
           await tx.query('update auth.users set raw_app_meta_data=$1 where id=$2', [
             JSON.stringify({
-              ssma_technician: { created_by: actor, name: displayName, service_region, service_state },
+              ssma_technician: { created_by: actor, name: displayName, coverage },
             }),
             id,
           ])
@@ -60,7 +60,11 @@ async function client(actor) {
       else if (name === 'ssma_profiles')
         body = (await pg.query('select * from public.ssma_profiles where user_id=$1', [actor])).rows[0]
       else if (name === 'ssma_records')
-        body = (await pg.query('select * from public.ssma_records where owner_id=$1', [actor])).rows
+        body = await pg.transaction(async (tx) => {
+          await tx.exec('set local role authenticated')
+          await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [actor])
+          return (await tx.query('select * from public.ssma_records')).rows
+        })
       else if (name === 'user') body = user
       else body = await call(actor, name, req.postDataJSON() || {})
       await route.fulfill({ json: body })
@@ -164,15 +168,16 @@ try {
   await admin.getByLabel('Nome completo', { exact: true }).fill('Maria de Teste')
   await admin.getByLabel('Usuário de acesso').fill('maria.local')
   await admin.getByLabel('Senha inicial').fill('local-fixture-only')
-  await admin.getByLabel('Região de atendimento', { exact: true }).selectOption('Centro-Oeste')
+  await admin.getByRole('checkbox', { name: 'Centro-Oeste', exact: true }).check()
+  await admin.getByRole('checkbox', { name: 'SP', exact: true }).check()
   await button(admin, 'Criar conta do técnico').click()
   await admin.getByRole('heading', { name: 'Cadastro de Maria de Teste' }).waitFor()
   const created = (
     await pg.query("select user_id,permissions from public.ssma_profiles where username='maria.local'")
   ).rows[0]
   assert.deepEqual(created.permissions, [])
-  assert.equal(await admin.getByLabel('Região de atendimento', { exact: true }).inputValue(), 'Centro-Oeste')
-  assert.equal(await admin.getByLabel('Estado de atendimento (opcional)').inputValue(), '')
+  assert.ok(await admin.getByRole('checkbox', { name: 'Centro-Oeste', exact: true }).isChecked())
+  assert.ok(await admin.getByRole('checkbox', { name: 'SP', exact: true }).isChecked())
   const techPage = await client(created.user_id)
   await techPage.goto(base)
   await techPage.locator('[name=username]').fill('maria.local')
@@ -180,20 +185,20 @@ try {
   await button(techPage, 'Entrar no sistema').click()
   await techPage.getByRole('heading', { name: 'Dashboard Geral', exact: true }).waitFor()
   assert.equal(await button(techPage, 'Painel Master').count(), 0)
-  await admin.getByLabel('Região de atendimento', { exact: true }).selectOption('Sudeste')
-  await admin.getByLabel('Estado de atendimento (opcional)').selectOption('MG')
+  await admin.getByRole('checkbox', { name: 'Centro-Oeste', exact: true }).uncheck()
+  await admin.getByRole('checkbox', { name: 'MG', exact: true }).check()
   await admin.getByLabel('Nome do técnico').fill('Maria Silva')
   await admin.getByLabel('Acesso ao sistema').selectOption('Inativo')
   await button(admin, 'Salvar cadastro').click()
   await admin.getByRole('heading', { name: 'Cadastro de Maria Silva' }).waitFor()
-  const coverage = await pg.query(
-    'select service_region,service_state from public.ssma_profiles where user_id=$1',
-    [created.user_id],
-  )
-  assert.deepEqual(coverage.rows[0], { service_region: 'Sudeste', service_state: 'MG' })
+  const coverage = await pg.query('select coverage from public.ssma_profiles where user_id=$1', [
+    created.user_id,
+  ])
+  assert.deepEqual(coverage.rows[0], { coverage: ['MG', 'SP'] })
   await assert.rejects(
-    () => pg.query("update public.ssma_profiles set service_state='DF' where user_id=$1", [created.user_id]),
-    /valid_service_area/,
+    () =>
+      pg.query("update public.ssma_profiles set coverage=array['XX'] where user_id=$1", [created.user_id]),
+    /coverage/,
   )
   await techPage.reload()
   await techPage.getByText(/Acesso desativado/).waitFor()

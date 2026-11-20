@@ -43,6 +43,14 @@ export async function epiFixture() {
       'utf8',
     ),
   )
+  await pg.query("update public.ssma_profiles set service_region='Centro-Oeste',service_state='DF'")
+  await pg.exec(
+    await readFile(
+      new URL('../supabase/migrations/20261120100933_cobertura_multirregional.sql', import.meta.url),
+      'utf8',
+    ),
+  )
+  await pg.query("update public.ssma_records set employee_state='DF' where module='colaboradores'")
   const call = (actor, name, body = {}) =>
     pg.transaction(async (tx) => {
       await tx.exec(actor ? 'set local role authenticated' : 'set local role anon')

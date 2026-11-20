@@ -20,38 +20,65 @@ const grants = [
     .map((m) => [m.id, m.name]),
   ...Object.entries(epiSections).map(([name, key]) => ['epi.' + key, 'EPI · ' + name]),
 ]
-function ServiceAreaFields({ areas, person }) {
-  const [region, setRegion] = useState(person?.service_region || '')
-  const [state, setState] = useState(person?.service_state || '')
-  const regions = Object.keys(areas).sort((a, b) => a.localeCompare(b, 'pt-BR'))
-  const states = (region ? areas[region] || [] : Object.values(areas).flat()).slice().sort()
+function areaSummary(areas, coverage = []) {
   return (
-    <>
-      <Select
-        label="Região de atendimento"
-        name="service_region"
-        placeholder="Não definida"
-        options={regions}
-        value={region}
-        onChange={(e) => {
-          const next = e.target.value
-          setRegion(next)
-          if (!areas[next]?.includes(state)) setState('')
-        }}
-      />
-      <Select
-        label="Estado de atendimento (opcional)"
-        name="service_state"
-        placeholder={region ? 'Toda a região' : 'Não definido'}
-        options={states}
-        value={state}
-        onChange={(e) => {
-          const next = e.target.value
-          setState(next)
-          if (next && !region) setRegion(regions.find((r) => areas[r].includes(next)))
-        }}
-      />
-    </>
+    Object.entries(areas)
+      .filter(([, ufs]) => ufs.some((uf) => coverage.includes(uf)))
+      .map(([name, ufs]) => {
+        const selected = ufs.filter((uf) => coverage.includes(uf))
+        return selected.length === ufs.length ? name + ' (toda a região)' : name + ' · ' + selected.join(', ')
+      })
+      .join(' / ') || 'Sem área definida'
+  )
+}
+function ServiceAreaFields({ areas, person }) {
+  const [selected, setSelected] = useState(person?.coverage || [])
+  function change(ufs, add) {
+    setSelected((current) =>
+      add ? [...new Set([...current, ...ufs])].sort() : current.filter((v) => !ufs.includes(v)),
+    )
+  }
+  return (
+    <div className="service-coverage">
+      <input type="hidden" name="coverage" value={JSON.stringify(selected)} />
+      <strong>Área de atendimento</strong>
+      <p className="epi-help">Marque regiões inteiras ou combine estados de regiões diferentes.</p>
+      <div className="coverage-grid">
+        {Object.entries(areas)
+          .sort(([a], [b]) => a.localeCompare(b, 'pt-BR'))
+          .map(([region, ufs]) => {
+            const all = ufs.every((v) => selected.includes(v)),
+              some = ufs.some((v) => selected.includes(v))
+            return (
+              <div key={region} role="group" aria-label={region}>
+                <label className="coverage-region">
+                  <input
+                    type="checkbox"
+                    checked={all}
+                    ref={(el) => {
+                      if (el) el.indeterminate = some && !all
+                    }}
+                    onChange={(e) => change(ufs, e.target.checked)}
+                  />
+                  {region}
+                </label>
+                <div className="coverage-states">
+                  {ufs.map((uf) => (
+                    <label key={uf}>
+                      <input
+                        type="checkbox"
+                        checked={selected.includes(uf)}
+                        onChange={(e) => change([uf], e.target.checked)}
+                      />
+                      {uf}
+                    </label>
+                  ))}
+                </div>
+              </div>
+            )
+          })}
+      </div>
+    </div>
   )
 }
 
@@ -178,9 +205,9 @@ export default function Master({ db, days, Trend, managing, navigate }) {
               <>
                 <ActionForm
                   submit="Criar conta do técnico"
-                  onSave={async ({ name, username, password, service_region, service_state }) => {
+                  onSave={async ({ name, username, password, coverage }) => {
                     const { data, error } = await db.functions.invoke('ssma-create-technician', {
-                      body: { name, username, password, service_region, service_state },
+                      body: { name, username, password, coverage: JSON.parse(coverage) },
                     })
                     if (error) {
                       const details = await error.context?.json?.().catch(() => null)
@@ -221,14 +248,13 @@ export default function Master({ db, days, Trend, managing, navigate }) {
               </>
             )}
             <Table
-              headers={['Nome', 'Usuário', 'Região de atendimento', 'Estado', 'Acesso', 'Ações']}
+              headers={['Nome', 'Usuário', 'Área de atendimento', 'Acesso', 'Ações']}
               rows={people
                 .filter((p) => !p.master)
                 .map((p) => [
                   p.name,
                   p.username,
-                  p.service_region || 'Não definida',
-                  p.service_state || (p.service_region ? 'Toda a região' : '—'),
+                  areaSummary(data.service_areas, p.coverage),
                   p.active ? 'Ativo' : 'Inativo',
                   <button
                     className="secondary"
@@ -248,13 +274,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
             <>
               <Panel title={'Cadastro de ' + selected.name}>
                 <ActionForm
-                  key={JSON.stringify([
-                    selected.id,
-                    selected.name,
-                    selected.active,
-                    selected.service_region,
-                    selected.service_state,
-                  ])}
+                  key={JSON.stringify([selected.id, selected.name, selected.active, selected.coverage])}
                   submit="Salvar cadastro"
                   onSave={async (p) => {
                     const { error } = await db.rpc('ssma_master', {
@@ -263,10 +283,8 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                         technician: selected.id,
                         name: p.name,
                         active: p.status === 'Ativo',
-                        service_region: p.service_region,
-                        service_state: p.service_state,
-                        previous_region: selected.service_region,
-                        previous_state: selected.service_state,
+                        coverage: JSON.parse(p.coverage),
+                        previous_coverage: selected.coverage,
                         previous_name: selected.name,
                         previous_active: selected.active,
                       },
@@ -329,10 +347,9 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                 onChange={(e) => setUf(e.target.value)}
               />
             </div>
-            {responsible?.service_region && (
+            {responsible && (
               <p className="epi-help">
-                Área de atendimento:{' '}
-                {[responsible.service_region, responsible.service_state].filter(Boolean).join(' · ')}
+                Área de atendimento: {areaSummary(data.service_areas, responsible.coverage)}
               </p>
             )}
             <div className="kpi-grid">

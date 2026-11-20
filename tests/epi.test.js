@@ -147,6 +147,12 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
     assert.equal((await portal('track', { code })).stage, 'Entregue')
     assert.equal((await portal('track', { code })).events.length, 6)
     await assert.rejects(() => portal('track', { code: 'inexistente' }))
+    await pg.query("update public.ssma_profiles set coverage=array['SP'] where user_id=$1", [tech])
+    data = await space(tech)
+    for (const key of ['requests', 'assignments', 'assets']) assert.deepEqual(data[key], [])
+    assert.ok(data.movements.every((m) => !m.request_id))
+    assert.deepEqual(await call(tech, 'ssma_epi_dashboard'), [])
+    await assert.rejects(() => manage(tech, 'test', { asset_id: asset, status: 'Em uso' }), /fora da área/)
   } finally {
     await pg.close()
   }

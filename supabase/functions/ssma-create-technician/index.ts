@@ -28,12 +28,17 @@ Deno.serve(async (req) => {
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     const service_region = body?.service_region ?? ''
     const service_state = body?.service_state ?? ''
+    const coverage = body?.coverage
     const password = body?.password
     if (
       !/^[a-z0-9][a-z0-9._-]{2,39}$/.test(login) ||
       login === 'cesar' ||
       !name ||
       name.length > 120 ||
+      (coverage !== undefined &&
+        (!Array.isArray(coverage) ||
+          coverage.length > 27 ||
+          coverage.some((uf) => typeof uf !== 'string' || !/^[A-Z]{2}$/.test(uf)))) ||
       typeof service_region !== 'string' ||
       service_region.length > 16 ||
       typeof service_state !== 'string' ||
@@ -52,7 +57,9 @@ Deno.serve(async (req) => {
       email: login + '@ssma.invalid',
       password,
       email_confirm: true,
-      app_metadata: { ssma_technician: { created_by: master, name, service_region, service_state } },
+      app_metadata: {
+        ssma_technician: { created_by: master, name, service_region, service_state, coverage },
+      },
     })
     if (error) {
       const duplicate = ['email_exists', 'user_already_exists'].includes(error.code || '')
