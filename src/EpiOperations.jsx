@@ -248,7 +248,7 @@ export function Finance({ data }) {
           rows={movements.map((m) => [
             stamp(m.created_at),
             m.kind,
-            variant(data.materials.find((i) => i.id === m.material_id)),
+            variant(m.material_label || data.materials.find((i) => i.id === m.material_id) || { name: 'Material excluído' }),
             m.qty,
             money(m.price),
             money(m.qty * m.price),

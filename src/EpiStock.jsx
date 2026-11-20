@@ -5,8 +5,8 @@ import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { available, variant, regionLabel, forecast, money, after365 } from './epiData'
 import { dateLabel, today } from './data'
 
-function PriceField({ label, placeholder }) {
-  const [value, setValue] = useState('')
+function PriceField({ label, placeholder, initialValue }) {
+  const [value, setValue] = useState(() => initialValue == null ? '' : Number(initialValue).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}))
   const plain = value.replaceAll('.', '').replace(',', '.')
   return (
     <>
@@ -36,6 +36,7 @@ function PriceField({ label, placeholder }) {
     </>
   )
 }
+const materialColors = ['Amarelo', 'Azul', 'Azul-marinho', 'Bege', 'Branco', 'Cinza', 'Incolor', 'Laranja', 'Marrom', 'Multicolorido', 'Preto', 'Rosa', 'Roxo', 'Verde', 'Vermelho', 'Vinho', 'Outra',]
 const numberProps = { type: 'number', min: 0, step: 1 }
 export function Regions({ data, employees, profile, save }) {
   const [emp, setEmp] = useState('')
@@ -102,8 +103,24 @@ export function Stock({ db, data, profile, save }) {
   const [ca, setCa] = useState(''),
     [name, setName] = useState(null),
     [ficha, setFicha] = useState(0)
+  const [selected, setSelected] = useState(null)
+  const editing = show === 'edit' ? selected : null
+  const formHeading = React.useRef(null)
+  React.useEffect(() => {
+    if (show === 'edit' || show === 'delete') formHeading.current?.focus()
+  }, [show, selected])
+  function selectMaterial(material, mode) {
+    setSelected(material)
+    setShow(mode)
+    setName(material.name)
+    setCa(material.ca)
+    setNoCA(material.no_ca)
+    setFicha(0)
+    setStart(material.glove_start || '')
+    setManualGlove(material.insulating_glove)
+  }
   const stockCa = !show && /^\d{1,70}$/.test(search.trim()) ? search.trim() : ''
-  const lookup = useCaLookup(db, show === 'lookup' || (show === 'new' && !noCA) ? ca : stockCa)
+  const lookup = useCaLookup(db, show === 'lookup' || ((show === 'new' || editing) && !noCA) ? ca : stockCa)
   const sheet = lookup?.records?.[ficha]
   const suggested = sheet?.equipamento || ''
   function changeCa(value) {
@@ -180,12 +197,27 @@ export function Stock({ db, data, profile, save }) {
             )}
           </div>
         )}
-        {show === 'new' && (
-          <ActionForm
-            submit="Salvar material"
+        {(editing || show === 'delete') && (
+          <h3 ref={formHeading} tabIndex={-1}>{editing ? 'Editar material' : 'Excluir material'} · {variant(selected)}</h3>
+        )}
+        {show === 'delete' && selected.reserved > 0 && <div className="notice" role="status">
+          <p>Este material tem reservas. Conclua ou cancele os pedidos antes de excluí-lo.</p>
+          <button type="button" className="secondary" onClick={() => setShow('')}>Fechar</button>
+        </div>}
+        {show === 'delete' && !selected.reserved && <ActionForm key={selected.id} submit="Confirmar exclusão"
+          onSave={() => save('delete_material',{material_id:selected.id, revision:selected.revision})} onDone={() => setShow('')}
+          >
+          <p>O material será retirado do estoque. O histórico de movimentações e entregas será preservado.</p>
+          {selected.qty > 0 && <p>Baixa de {selected.qty} unidade(s) no estoque.</p>}
+          <button type="button" className="secondary" onClick={() => setShow('')}>Cancelar</button>
+        </ActionForm>}
+        {(show === 'new' || editing) && (
+          <ActionForm key={editing?.id || 'new'}
+            submit={editing ? 'Salvar alterações' : 'Salvar material'}
             onSave={(p) =>
-              save('material', {
+              save(editing ? 'edit_material' : 'material', {
                 ...p,
+                ...(editing && {material_id:editing.id, revision:editing.revision, qty:p.qty || 0, minimum:p.minimum || 0, price:p.price || 0}),
                 insulating_glove: glove,
                 glove_start: glove ? start : null,
                 no_ca: noCA,
@@ -220,8 +252,8 @@ export function Stock({ db, data, profile, save }) {
               Material sem CA
             </label>
             {!noCA && <CaResult result={lookup} index={ficha} onSelect={setFicha} />}
-            <PriceField label="Valor unitário (R$)" />
-            <Field label="Quantidade" name="qty" {...numberProps} />
+            <PriceField label="Valor unitário (R$)" initialValue={editing?.price} />
+            <Field label="Quantidade" name="qty" {...numberProps} min={editing?.reserved || 0} defaultValue={editing?.qty} />
             {sheet && !noCA && (
               <CaExpiryEditor key={[ca, sheet.sheet_key, sheet.validade_manual].join('/')} sheet={sheet} />
             )}
@@ -248,33 +280,19 @@ export function Stock({ db, data, profile, save }) {
             ) : (
               <details className="material-lot-expiry">
                 <summary>Validade do lote (opcional)</summary>
-                <Field label="Vencimento do material em estoque" name="expiry" type="date" />
+                <Field label="Vencimento do material em estoque" name="expiry" type="date" defaultValue={editing?.expiry} />
               </details>
             )}
-            <Field label="Quantidade mínima" name="minimum" {...numberProps} />
-            <Field label="Tamanho / numeração" name="size" />
+            <Field label="Quantidade mínima" name="minimum" {...numberProps} defaultValue={editing?.minimum} />
+            <Field label="Tamanho / numeração" name="size" defaultValue={editing?.size} />
             <Select
               label="Cor"
               name="color"
+              defaultValue={editing?.color}
               placeholder="Selecione a cor"
               options={[
-                'Amarelo',
-                'Azul',
-                'Azul-marinho',
-                'Bege',
-                'Branco',
-                'Cinza',
-                'Incolor',
-                'Laranja',
-                'Marrom',
-                'Multicolorido',
-                'Preto',
-                'Rosa',
-                'Roxo',
-                'Verde',
-                'Vermelho',
-                'Vinho',
-                'Outra',
+                ...materialColors,
+                ...(editing?.color && !materialColors.includes(editing.color) ? [editing.color] : []),
               ]}
             />
             <Select
@@ -282,8 +300,10 @@ export function Stock({ db, data, profile, save }) {
               name="region_id"
               options={regionalOptions}
               placeholder="Selecione a unidade"
+              defaultValue={editing?.region_id}
               required
             />
+            {editing && <button className="secondary" type="button" onClick={() => setShow('')}>Cancelar edição</button>}
           </ActionForm>
         )}
         {show === 'entry' && (
@@ -334,8 +354,10 @@ export function Stock({ db, data, profile, save }) {
             'Reservado',
             'Disponível',
             'Mínimo',
+            'Reposição',
             'Valor unitário',
             'Validade',
+            'Ações',
           ]}
           rows={materials.map((m) => [
             variant(m),
@@ -354,7 +376,8 @@ export function Stock({ db, data, profile, save }) {
             m.qty,
             m.reserved,
             available(m),
-            <span className={available(m) < m.minimum ? 'badge red' : ''}>{m.minimum}</span>,
+            m.minimum,
+            <span className={'badge ' + (available(m) < m.minimum ? 'red' : 'green')}>{available(m) < m.minimum ? 'Comprar' : 'Ideal'}</span>,
             money(m.price),
             <div>
               {m.insulating_glove && (
@@ -369,6 +392,10 @@ export function Stock({ db, data, profile, save }) {
                 </details>
               )}
               <span className={m.expiry && m.expiry < today() ? 'red-text' : ''}>{dateLabel(m.expiry)}</span>
+            </div>,
+            <div className="button-group">
+              <button className="secondary" aria-label={'Editar ' + variant(m)} onClick={() => selectMaterial(m,'edit')}>Editar</button>
+              <button className="secondary" aria-label={'Excluir ' + variant(m)} onClick={() => selectMaterial(m,'delete')}>Excluir</button>
             </div>,
           ])}
           empty="Nenhum material encontrado neste estoque."

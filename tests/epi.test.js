@@ -242,3 +242,39 @@ test('unidades distribuem pelo projeto sem alterar a UF ou as reservas anteriore
     await pg.close()
   }
 })
+
+test('edição e exclusão preservam o histórico, as reservas e as permissões de estoque', async () => {
+  const { pg, owner, tech, employee, call } = await epiFixture()
+  const manage = (actor, action, p) => call(actor,'ssma_epi_manage',{action,p})
+  const stock = () => call(owner,'ssma_epi_workspace')
+  try {
+    await pg.query('update public.ssma_profiles set is_master=true where user_id=$1',[owner])
+    await applyDistributionUnits(pg)
+    const region = (await stock()).regions.find(r => r.distribution_unit==='RJ').id
+    const id = randomUUID()
+    const fields = {name:'Óculos',no_ca:true,size:'',color:'',qty:4,price:20,minimum:5,region_id:region}
+    await manage(owner,'material',{...fields,id})
+    const edit = (revision, extra) => manage(owner,'edit_material',{...fields,material_id:id,revision,...extra})
+    await assert.rejects(manage(tech,'delete_material',{material_id:id,revision:0}))
+    await edit(0,{name:'Óculos claro',qty:5})
+    await assert.rejects(edit(0,{qty:1}),/mudou/)
+    await manage(owner,'project_unit',{project:'Projeto Norte',region_id:region})
+    const request_id = randomUUID()
+    const person = {employee_id:employee,state:'DF'}
+    await call(null,'ssma_epi_portal',{action:'submit',p:{...person,id:request_id,items:[{id,qty:2}]}})
+    const current = (await stock()).materials.find(m=>m.id===id)
+    await assert.rejects(manage(owner,'delete_material',{material_id:id,revision:current.revision}),/reservas/)
+    await assert.rejects(edit(current.revision,{name:'Óculos claro',qty:1}),/reservas/)
+    await manage(owner,'deliver',{request_id})
+    await manage(owner,'delete_material',{material_id:id,revision:(await stock()).materials[0].revision})
+    const after = await stock()
+    assert.equal(after.materials.length,0)
+    assert.equal(after.requests[0].items[0].name,'Óculos claro')
+    assert.equal(after.movements.find(v=>v.kind==='Entrada').material_label.name,'Óculos')
+    assert.equal(after.movements.find(v=>v.kind==='Ajuste de saída').qty,3)
+    assert.equal((await call(null,'ssma_epi_portal',{action:'context',p:person})).materials.length,0)
+    await assert.rejects(manage(owner,'entry',{id:randomUUID(),material_id:id,qty:1,price:20}),/excluído/)
+  } finally {
+    await pg.close()
+  }
+})
