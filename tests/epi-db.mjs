@@ -51,6 +51,12 @@ export async function epiFixture() {
     ),
   )
   await pg.query("update public.ssma_records set employee_state='DF' where module='colaboradores'")
+  await pg.exec(
+    await readFile(
+      new URL('../supabase/migrations/20261120102541_acoes_tecnicos_master.sql', import.meta.url),
+      'utf8',
+    ),
+  )
   const call = (actor, name, body = {}) =>
     pg.transaction(async (tx) => {
       await tx.exec(actor ? 'set local role authenticated' : 'set local role anon')

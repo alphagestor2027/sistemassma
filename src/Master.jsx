@@ -137,6 +137,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
     [edit, setEdit] = useState(''),
     [creating, setCreating] = useState(false),
     [notice, setNotice] = useState(''),
+    [changingAccess, setChangingAccess] = useState(false),
     [error, setError] = useState('')
   async function reload() {
     const { data, error } = await db.rpc('ssma_master', { action: 'overview', p: {} })
@@ -146,6 +147,52 @@ export default function Master({ db, days, Trend, managing, navigate }) {
     }
     setData(data)
     setError('')
+  }
+  async function changeAccess(person, action) {
+    if (changingAccess) return
+    if (
+      action === 'remove_technician' &&
+      !window.confirm(
+        'Remover ' +
+          person.name +
+          ' (' +
+          person.username +
+          ') da gestão de técnicos? O acesso será encerrado e o histórico de trabalho será preservado.',
+      )
+    )
+      return
+    setChangingAccess(true)
+    setNotice('')
+    try {
+      const { data: result, error } = await db.rpc('ssma_master', {
+        action,
+        p: { technician: person.id, previous_active: person.active },
+      })
+      if (error) throw error
+      if (action === 'remove_technician') {
+        if (edit === person.id) setEdit('')
+        if (tech === person.id) {
+          setTech('')
+          setUf('')
+        }
+      }
+      await reload()
+      const message = {
+        block_technician: 'Acesso bloqueado',
+        unblock_technician: 'Acesso desbloqueado',
+        remove_technician: 'Técnico removido',
+      }
+      const regionalNotice = result?.region_count
+        ? '. Atualize o responsável em EPI › Regionais e vínculos (' +
+          result.region_count +
+          ' com este responsável).'
+        : ''
+      setNotice(message[action] + ' · ' + person.name + regionalNotice)
+    } catch (err) {
+      setError(err.message || 'Não foi possível atualizar o acesso.')
+    } finally {
+      setChangingAccess(false)
+    }
   }
   useEffect(() => {
     reload()
@@ -255,17 +302,33 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                   p.name,
                   p.username,
                   areaSummary(data.service_areas, p.coverage),
-                  p.active ? 'Ativo' : 'Inativo',
-                  <button
-                    className="secondary"
-                    onClick={() => {
-                      setEdit(p.id)
-                      setCreating(false)
-                      setNotice('')
-                    }}
-                  >
-                    Gerenciar {p.name}
-                  </button>,
+                  p.active ? 'Ativo' : 'Bloqueado',
+                  <div className="technician-actions">
+                    <button
+                      className="secondary"
+                      onClick={() => {
+                        setEdit(p.id)
+                        setCreating(false)
+                        setNotice('')
+                      }}
+                    >
+                      Gerenciar {p.name}
+                    </button>
+                    <button
+                      className="secondary"
+                      disabled={changingAccess}
+                      onClick={() => changeAccess(p, p.active ? 'block_technician' : 'unblock_technician')}
+                    >
+                      {p.active ? 'Bloquear' : 'Desbloquear'}
+                    </button>
+                    <button
+                      className="secondary remove-technician"
+                      disabled={changingAccess}
+                      onClick={() => changeAccess(p, 'remove_technician')}
+                    >
+                      Remover
+                    </button>
+                  </div>,
                 ])}
               empty="Nenhum técnico cadastrado. Use Cadastrar técnico para criar a primeira conta."
             />

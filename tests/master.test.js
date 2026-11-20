@@ -109,3 +109,59 @@ test('cobertura compartilhada filtra colaboradores e registros pelo estado e pel
     await pg.close()
   }
 })
+
+test('bloqueio, desbloqueio e remoção são exclusivos do Master e preservam o histórico', async () => {
+  const { pg, owner, tech: prior, call } = await epiFixture()
+  const tech = crypto.randomUUID()
+  try {
+    await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
+    await pg.query(
+      "insert into auth.users(id,email,raw_app_meta_data) values($1,'regional@ssma.invalid',jsonb_build_object('ssma_technician',jsonb_build_object('created_by',$2::uuid,'name','Técnico regional')))",
+      [tech, owner],
+    )
+    await pg.query(
+      'update public.ssma_profiles set permissions=(select permissions from public.ssma_profiles where user_id=$2) where user_id=$1',
+      [tech, prior],
+    )
+    const manage = (actor, action, technician, previous_active) =>
+      call(actor, 'ssma_master', { action, p: { technician, previous_active } })
+    for (const action of ['block_technician', 'unblock_technician', 'remove_technician']) {
+      await assert.rejects(() => manage(tech, action, owner, true), /exclusivo/)
+      await assert.rejects(() => manage(owner, action, owner, true), /indisponível/)
+    }
+    await manage(owner, 'block_technician', tech, true)
+    assert.equal(await call(tech, 'ssma_epi_workspace'), null)
+    await assert.rejects(() => manage(owner, 'remove_technician', tech, true), /acesso mudou/)
+    await manage(owner, 'unblock_technician', tech, false)
+    assert.ok(await call(tech, 'ssma_epi_workspace'))
+    await pg.query(
+      "insert into public.ssma_records(owner_id,module,title) values($1,'treinamentos','Registro histórico')",
+      [tech],
+    )
+    await manage(owner, 'remove_technician', tech, true)
+    assert.equal(await call(tech, 'ssma_epi_workspace'), null)
+    const overview = await call(owner, 'ssma_master', { action: 'overview', p: {} })
+    assert.ok(!overview.people.some((p) => p.id === tech))
+    assert.equal(
+      (await pg.query('select count(*)::int n from public.ssma_records where owner_id=$1', [tech])).rows[0].n,
+      1,
+    )
+    await assert.rejects(() => manage(owner, 'unblock_technician', tech, false), /indisponível/)
+    await assert.rejects(
+      () =>
+        call(owner, 'ssma_master', {
+          action: 'edit_technician',
+          p: {
+            technician: tech,
+            name: 'Novo nome',
+            previous_name: 'Técnico regional',
+            active: true,
+            previous_active: false,
+          },
+        }),
+      /Cadastro alterado/,
+    )
+  } finally {
+    await pg.close()
+  }
+})

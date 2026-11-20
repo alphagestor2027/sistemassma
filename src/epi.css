@@ -358,3 +358,11 @@
 .coverage-grid input {
   accent-color: var(--red);
 }
+.technician-actions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 0.5rem;
+}
+.technician-actions .remove-technician {
+  color: #b42332;
+}
