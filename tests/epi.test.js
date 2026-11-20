@@ -59,13 +59,11 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
       qty: 20,
       no_ca: true,
     })
-    await assert.rejects(() =>
-      portal('submit', { ...who, id: randomUUID(), items: [{ id: foreignCenter, qty: 1 }] }),
-    )
+
     await manage(tech, 'entry', { id: randomUUID(), material_id: mat, qty: 4, price: 20 })
     assert.deepEqual(
       (await portal('context', who)).materials.map((m) => m.id),
-      [mat],
+      [mat, foreignCenter],
     )
     const request = { ...who, id: randomUUID(), items: [{ id: mat, qty: 2 }] }
     const code = await portal('submit', request)
@@ -99,7 +97,7 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
       portal('submit', { ...request, id: randomUUID(), items: [{ id: mat, qty: 7 }] }),
     )
     await assert.rejects(() => manage(owner, 'deliver', { request_id: request.id, destination: 'Projeto' }))
-    await assert.rejects(() => manage(tech, 'deliver', { request_id: request.id }))
+
     let data = await space()
     assert.equal(data.requests.length, 1)
     assert.equal(data.materials.find((m) => m.id === mat).reserved, 2)
@@ -119,7 +117,7 @@ test('ciclo de estoque, autorização, entrega, financeiro e reteste no PostgreS
       expenseGroups(data.requests)
         .map((g) => g.cents)
         .sort((a, b) => a - b),
-      [1500, 3000],
+      [4500],
     )
     await manage(owner, 'asset', {
       request_id: request.id,
@@ -169,4 +167,38 @@ test('previsão considera o cargo, o último recebimento, reservas e estoque mí
     { employee_id: 'a', region_id: 'r', items: [{ material_id: 'm', qty: 1 }], status: 'Solicitado' },
   ]
   assert.deepEqual(forecast(m, rules, members, requests, 30, '2026-11-01'), { demand: 3, buy: 3 })
+})
+test('estoque regional, custo e validade do lote de luvas', async () => {
+  const { pg, owner, tech, call } = await epiFixture()
+  try {
+    const material = randomUUID()
+    const save = (actor, p) => call(actor, 'ssma_epi_manage', { action: 'material', p })
+    const item = {
+      id: material,
+      name: 'Luva isolante',
+      no_ca: true,
+      price: 185.35,
+      qty: 2,
+      region_state: 'DF',
+    }
+    await assert.rejects(() => save(tech, item), /data do certificado/)
+    await assert.rejects(
+      () => save(tech, { ...item, region_state: 'SP', glove_start: '2026-01-01' }),
+      /UF fora/,
+    )
+    await save(tech, { ...item, glove_start: '2026-01-01' })
+    const stock = (await call(tech, 'ssma_epi_workspace')).materials.find((m) => m.id === material)
+    assert.equal(stock.expiry, '2027-01-01')
+    assert.equal(stock.stock_center, 'SSMA')
+    const summary = () => call(tech, 'ssma_epi_glove_summary', {})
+    const rows = await summary()
+    assert.equal(rows.length, 1)
+    assert.equal(rows[0].cost, 370.7)
+    await pg.query("update public.ssma_profiles set coverage=array['SP'] where user_id=$1", [tech])
+    assert.equal((await summary())[0].qty, 0)
+    await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
+    assert.equal((await call(owner, 'ssma_epi_glove_summary', {})).find((r) => r.state === 'DF').qty, 2)
+  } finally {
+    await pg.close()
+  }
 })

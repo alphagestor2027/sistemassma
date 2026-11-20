@@ -1,4 +1,5 @@
 import React, { useEffect, useState } from 'react'
+import { dateLabel } from './data'
 import { Field } from './EpiShared'
 
 export function useCaLookup(db, input) {
@@ -90,7 +91,8 @@ export function CaResult({ result, index, onSelect, onRegister }) {
           ['Fabricante', ficha.fabricante],
           ['CNPJ', ficha.cnpj],
           ['Situação na base', ficha.situacao],
-          ['Validade do CA', ficha.validade],
+          ['Validade do CA', ficha.validade_manual ? dateLabel(ficha.validade_manual) : ficha.validade],
+          ...(ficha.validade_manual ? [['Validade original na base', ficha.validade]] : []),
         ].map(([label, value]) => (
           <div key={label}>
             <dt>{label}</dt>
@@ -126,5 +128,66 @@ export function CaResult({ result, index, onSelect, onRegister }) {
         </button>
       )}
     </section>
+  )
+}
+
+export function CaExpiryEditor({ sheet, onSave }) {
+  const [editing, setEditing] = useState(false),
+    [date, setDate] = useState(''),
+    [busy, setBusy] = useState(false),
+    [error, setError] = useState('')
+  return (
+    <div className="ca-expiry-editor">
+      <label className="epi-check">
+        <input
+          type="checkbox"
+          checked={editing}
+          disabled={busy}
+          onChange={(e) => {
+            setEditing(e.target.checked)
+            setDate('')
+            setError('')
+          }}
+        />
+        Deseja atualizar a data de validade do CA?
+      </label>
+      {editing && (
+        <>
+          <Field
+            label="Nova validade do CA"
+            type="date"
+            name="ca_expiry"
+            required
+            value={date}
+            disabled={busy}
+            onChange={(e) => setDate(e.target.value)}
+          />
+          <input type="hidden" name="sheet_key" value={sheet.sheet_key} />
+          <p className="epi-help">A nova data será exibida nas consultas desta ficha de CA.</p>
+          {onSave && (
+            <button
+              type="button"
+              className="secondary"
+              disabled={!date || busy}
+              onClick={async () => {
+                setBusy(true)
+                setError('')
+                try {
+                  await onSave(date)
+                  setEditing(false)
+                } catch (err) {
+                  setError(err.message || 'Não foi possível salvar a validade.')
+                } finally {
+                  setBusy(false)
+                }
+              }}
+            >
+              Salvar validade do CA
+            </button>
+          )}
+          {error && <p role="alert">{error}</p>}
+        </>
+      )}
+    </div>
   )
 }

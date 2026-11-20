@@ -1,3 +1,4 @@
+import { ReplacementAlert } from './EpiIndicators'
 import React, { useState } from 'react'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { money, variant, regionLabel, expenseGroups, stamp, nextStatus } from './epiData'
@@ -104,13 +105,7 @@ export function Requests({ data, profile, save, refresh }) {
                     submit="Confirmar entrega"
                     onSave={(p) => save('deliver', { ...p, request_id: q.id })}
                   >
-                    <Select
-                      label="Lançar despesa em"
-                      name="destination"
-                      placeholder="Confirmar destino do custo"
-                      options={['Projeto', 'SSMA']}
-                      required
-                    />
+                    <p>Despesa da entrega: {q.project}</p>
                   </ActionForm>
                 )}
                 <details>
@@ -185,7 +180,14 @@ export function Finance({ data }) {
             ['Entradas de material', movementValue('Entrada')],
             ['Saídas por entrega', movementValue('Saída')],
             ['Despesas dos projetos', groupValue('Projeto')],
-            ['Custos do SSMA', groupValue('SSMA')],
+            [
+              'Saldo financeiro em estoque · SSMA',
+              sum(
+                data.materials.filter((m) => !region || m.region_id === region),
+                (m) => m.qty * Math.round(m.price * 100),
+              ) / 100,
+            ],
+            ['Entregas históricas ao SSMA', groupValue('SSMA')],
           ].map(([label, v]) => (
             <div key={label}>
               <small>{label}</small>
@@ -291,6 +293,7 @@ export function Sheet({ data, employees }) {
             </div>
           </header>
           <h3>{names.get(id)}</h3>
+          <ReplacementAlert requests={delivered} />
           <p className="epi-help">Emissão em {dateLabel(today())}</p>
           <Table
             headers={[

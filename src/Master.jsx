@@ -1,3 +1,4 @@
+import { GloveIndicators } from './EpiIndicators'
 import React, { useEffect, useState } from 'react'
 import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2 } from 'lucide-react'
 import { modules, groups } from './config'
@@ -511,6 +512,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
               ))}
             </div>
           </Panel>
+          <GloveIndicators revision={data} db={db} technician={tech} region={region} uf={uf} />
           <Panel title="Projetos por região e estado">
             <p className="epi-help">Vínculos atuais da área selecionada.</p>
             <Table

@@ -12,7 +12,12 @@ export const stamp = (value) =>
   })
 export const variant = (m) => [m.name, m.size && 'Tam. ' + m.size, m.color].filter(Boolean).join(' · ')
 export const regionLabel = (r) => (r ? [r.state, r.name, r.technician].join(' · ') : 'Sem regional')
-export const available = (m, date = today()) => (m.expiry && m.expiry < date ? 0 : m.qty - m.reserved)
+export const available = (m, date = today()) =>
+  m.insulating_glove && (!m.glove_start || m.glove_start > date)
+    ? 0
+    : m.expiry && m.expiry < date
+      ? 0
+      : m.qty - m.reserved
 export const nextStatus = {
   'Em uso': ['Em trânsito'],
   'Em trânsito': ['No laboratório'],
@@ -29,10 +34,7 @@ export function forecast(material, rules, assignments, requests, horizon, date =
   for (const rule of rules.filter((s) => s.material_id === material.id)) {
     const members = assignments.filter(
       (a) =>
-        a.active !== false &&
-        a.region_id === material.region_id &&
-        (!material.stock_center || a.center?.toLowerCase() === material.stock_center.toLowerCase()) &&
-        a.job.trim().toLowerCase() === rule.job,
+        a.active !== false && a.region_id === material.region_id && a.job.trim().toLowerCase() === rule.job,
     )
     for (const member of members) {
       const orders = requests.filter(
@@ -76,4 +78,18 @@ export function expenseGroups(requests) {
       groups.set(key, row)
     }
   return [...groups.values()]
+}
+export function after365(date) {
+  if (!date) return ''
+  const end = new Date(date + 'T12:00:00Z')
+  end.setUTCDate(end.getUTCDate() + 365)
+  return end.toISOString().slice(0, 10)
+}
+
+export const stockAreas = {
+  'Centro-Oeste': 'DF GO MT MS',
+  Nordeste: 'AL BA CE MA PB PE PI RN SE',
+  Norte: 'AC AP AM PA RO RR TO',
+  Sudeste: 'ES MG RJ SP',
+  Sul: 'PR RS SC',
 }

@@ -420,3 +420,16 @@
 .ca-result button {
   margin-top: 0.65rem;
 }
+.ca-expiry-editor {
+  align-self: center;
+}
+.ca-expiry-editor .epi-check {
+  padding-block: 0.5rem;
+}
+.material-lot-expiry {
+  align-self: center;
+  font-size: 0.85rem;
+}
+.material-lot-expiry summary {
+  cursor: pointer;
+}

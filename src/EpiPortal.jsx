@@ -1,3 +1,4 @@
+import { ReplacementAlert } from './EpiIndicators'
 import React, { useEffect, useRef, useState } from 'react'
 import { HardHat, ClipboardList } from 'lucide-react'
 import { Panel, Select, Field, Table, rpc } from './EpiShared'
@@ -161,6 +162,7 @@ export default function EpiPortal({ db }) {
         )}
         {context && (
           <>
+            <ReplacementAlert requests={context.history} />
             <section className="epi-context">
               {[
                 ['Projeto', context.project],
