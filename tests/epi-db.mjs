@@ -100,7 +100,7 @@ export async function epiFixture() {
 export async function applyDistributionUnits(pg) {
   const dir = new URL('../supabase/migrations/', import.meta.url)
   const files = await readdir(dir)
-  for (const suffix of ['_unidades_distribuicao_projeto.sql', '_manutencao_materiais_estoque.sql']) {
+  for (const suffix of ['_unidades_distribuicao_projeto.sql', '_manutencao_materiais_estoque.sql', '_numeros_luvas_por_mao.sql']) {
     const name = files.find(file => file.endsWith(suffix))
     await pg.exec(await readFile(new URL(name, dir), 'utf8'))
   }

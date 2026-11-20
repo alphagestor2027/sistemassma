@@ -275,6 +275,10 @@ export function Stock({ db, data, profile, save }) {
                   required
                   onChange={(e) => setStart(e.target.value)}
                 />
+                <Field label="Número da luva esquerda" name="glove_left_number" maxLength={100}
+                  defaultValue={editing?.glove_left_number || ''} />
+                <Field label="Número da luva direita" name="glove_right_number" maxLength={100}
+                  defaultValue={editing?.glove_right_number || ''} />
                 {start && <p>Vencimento da luva: {dateLabel(after365(start))}</p>}
               </>
             ) : (
