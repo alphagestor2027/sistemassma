@@ -35,7 +35,19 @@ async function client(actor) {
       name = url.pathname.split('/').pop()
     try {
       let body
-      if (name === 'token')
+      if (name === 'ssma-create-technician') {
+        await call(actor, 'ssma_master', { action: 'authorize_creation', p: {} })
+        const { name: displayName, username } = req.postDataJSON()
+        const id = crypto.randomUUID()
+        await pg.transaction(async (tx) => {
+          await tx.query('insert into auth.users(id,email) values($1,$2)', [id, username + '@ssma.invalid'])
+          await tx.query('update auth.users set raw_app_meta_data=$1 where id=$2', [
+            JSON.stringify({ ssma_technician: { created_by: actor, name: displayName } }),
+            id,
+          ])
+        })
+        body = { id }
+      } else if (name === 'token')
         body = {
           access_token: token,
           refresh_token: 'test-local',
@@ -142,7 +154,34 @@ try {
   await admin.getByLabel('Técnico de segurança', { exact: true }).selectOption(owner)
   await admin.getByLabel('Estado', { exact: true }).selectOption('DF')
   await admin.getByRole('cell', { name: 'Projeto Norte', exact: true }).waitFor()
-  await admin.getByLabel('Editar permissões de').selectOption(tech)
+  await admin
+    .getByRole('navigation', { name: 'Administração Master' })
+    .getByRole('button', { name: 'Gestão de técnicos' })
+    .click()
+  await button(admin, 'Cadastrar técnico').click()
+  await admin.getByLabel('Nome completo', { exact: true }).fill('Maria de Teste')
+  await admin.getByLabel('Usuário de acesso').fill('maria.local')
+  await admin.getByLabel('Senha inicial').fill('local-fixture-only')
+  await button(admin, 'Criar conta do técnico').click()
+  await admin.getByRole('heading', { name: 'Cadastro de Maria de Teste' }).waitFor()
+  const created = (
+    await pg.query("select user_id,permissions from public.ssma_profiles where username='maria.local'")
+  ).rows[0]
+  assert.deepEqual(created.permissions, [])
+  const techPage = await client(created.user_id)
+  await techPage.goto(base)
+  await techPage.locator('[name=username]').fill('maria.local')
+  await techPage.locator('[name=password]').fill('local-fixture-only')
+  await button(techPage, 'Entrar no sistema').click()
+  await techPage.getByRole('heading', { name: 'Dashboard Geral', exact: true }).waitFor()
+  assert.equal(await button(techPage, 'Painel Master').count(), 0)
+  await admin.getByLabel('Nome do técnico').fill('Maria Silva')
+  await admin.getByLabel('Acesso ao sistema').selectOption('Inativo')
+  await button(admin, 'Salvar cadastro').click()
+  await admin.getByRole('heading', { name: 'Cadastro de Maria Silva' }).waitFor()
+  await techPage.reload()
+  await techPage.getByText(/Acesso desativado/).waitFor()
+  await button(admin, 'Gerenciar Técnico regional').click()
   await admin.getByLabel('EPI · Estoque', { exact: true }).uncheck()
   await button(admin, 'Salvar permissões').click()
   await admin.getByText('Permissões salvas.', { exact: true }).waitFor()

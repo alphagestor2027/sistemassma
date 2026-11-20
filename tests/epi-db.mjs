@@ -8,7 +8,7 @@ export async function epiFixture() {
     tech = randomUUID(),
     employee = randomUUID()
   await pg.exec(`create schema auth; create role anon; create role authenticated;
- create table auth.users(id uuid primary key);
+ create table auth.users(id uuid primary key,email text unique,raw_app_meta_data jsonb);
  create function auth.uid() returns uuid language sql stable as $$ select nullif(current_setting('request.jwt.claim.sub',true),'')::uuid $$;
  grant usage on schema auth to authenticated,anon;`)
   for (const file of [
@@ -30,6 +30,12 @@ export async function epiFixture() {
   )
   await pg.exec(
     await readFile(new URL('../supabase/migrations/20261120015613_ssma_master.sql', import.meta.url), 'utf8'),
+  )
+  await pg.exec(
+    await readFile(
+      new URL('../supabase/migrations/20261120020836_gestao_tecnicos.sql', import.meta.url),
+      'utf8',
+    ),
   )
   const call = (actor, name, body = {}) =>
     pg.transaction(async (tx) => {

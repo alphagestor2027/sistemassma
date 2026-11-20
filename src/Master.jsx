@@ -3,7 +3,7 @@ import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2 } from 
 import { modules, groups } from './config'
 import { epiSections } from './access'
 import { indicators, percent } from './data'
-import { Select, Panel, Table } from './EpiShared'
+import { Select, Panel, Table, ActionForm, Field } from './EpiShared'
 import './epi.css'
 
 const metrics = [
@@ -68,11 +68,13 @@ function Permissions({ person, db, reload }) {
     </form>
   )
 }
-export default function Master({ db, days, Trend }) {
+export default function Master({ db, days, Trend, managing, navigate }) {
   const [data, setData] = useState(null),
     [tech, setTech] = useState(''),
     [uf, setUf] = useState(''),
     [edit, setEdit] = useState(''),
+    [creating, setCreating] = useState(false),
+    [notice, setNotice] = useState(''),
     [error, setError] = useState('')
   async function reload() {
     const { data, error } = await db.rpc('ssma_master', { action: 'overview', p: {} })
@@ -105,104 +107,235 @@ export default function Master({ db, days, Trend }) {
   }
   return (
     <div className="epi">
-      <Panel
-        title="Indicadores de SSMA"
-        action={
-          <button className="secondary" onClick={reload}>
-            Atualizar
-          </button>
-        }
-      >
-        <div className="epi-filters">
-          <Select
-            label="Técnico de segurança"
-            placeholder="Todos os responsáveis"
-            options={people.map((p) => [p.id, p.name])}
-            value={tech}
-            onChange={(e) => {
-              setTech(e.target.value)
-              setUf('')
-              setEdit(e.target.value)
-            }}
-          />
-          <Select
-            label="Estado"
-            placeholder="Todos os estados"
-            options={[...new Set(projects.map((p) => p.state))].sort()}
-            value={uf}
-            onChange={(e) => setUf(e.target.value)}
-          />
-        </div>
-        <div className="kpi-grid">
-          {metrics.map(([label, I], i) => (
-            <div className="card kpi" key={label}>
-              <span className="tile">
-                <I size={20} />
-              </span>
-              <span>{label}</span>
-              <strong>{totals[i]}</strong>
+      <nav className="button-group" aria-label="Administração Master">
+        <button className={managing ? 'secondary' : 'primary'} onClick={() => navigate('master')}>
+          Visão geral
+        </button>
+        <button className={managing ? 'primary' : 'secondary'} onClick={() => navigate('technicians')}>
+          <Users size={16} />
+          Gestão de técnicos
+        </button>
+      </nav>
+      {managing ? (
+        <>
+          <Panel
+            title="Técnicos de segurança"
+            action={
+              <button
+                className="primary"
+                onClick={() => {
+                  setCreating(true)
+                  setEdit('')
+                  setNotice('')
+                }}
+              >
+                Cadastrar técnico
+              </button>
+            }
+          >
+            {notice && (
+              <p className="epi-success" role="status">
+                {notice}
+              </p>
+            )}
+            {creating && (
+              <>
+                <ActionForm
+                  submit="Criar conta do técnico"
+                  onSave={async ({ name, username, password }) => {
+                    const { data, error } = await db.functions.invoke('ssma-create-technician', {
+                      body: { name, username, password },
+                    })
+                    if (error) {
+                      const details = await error.context?.json?.().catch(() => null)
+                      throw Error(
+                        details?.message || 'Não foi possível cadastrar. Atualize a lista e tente novamente.',
+                      )
+                    }
+                    await reload()
+                    setEdit(data.id)
+                    setCreating(false)
+                    setNotice('Técnico cadastrado. Selecione os módulos que ele poderá acessar.')
+                  }}
+                >
+                  <Field label="Nome completo" name="name" maxLength={120} required />
+                  <Field
+                    label="Usuário de acesso"
+                    name="username"
+                    required
+                    minLength={3}
+                    maxLength={40}
+                    pattern="[a-z0-9][a-z0-9._\\-]{2,39}"
+                    placeholder="Ex.: maria.silva"
+                  />
+                  <Field
+                    label="Senha inicial"
+                    name="password"
+                    type="password"
+                    autoComplete="new-password"
+                    required
+                    minLength={8}
+                    maxLength={72}
+                  />
+                </ActionForm>
+                <button className="text-button" onClick={() => setCreating(false)}>
+                  Cancelar cadastro
+                </button>
+              </>
+            )}
+            <Table
+              headers={['Nome', 'Usuário', 'Acesso', 'Ações']}
+              rows={people
+                .filter((p) => !p.master)
+                .map((p) => [
+                  p.name,
+                  p.username,
+                  p.active ? 'Ativo' : 'Inativo',
+                  <button
+                    className="secondary"
+                    onClick={() => {
+                      setEdit(p.id)
+                      setCreating(false)
+                      setNotice('')
+                    }}
+                  >
+                    Gerenciar {p.name}
+                  </button>,
+                ])}
+              empty="Nenhum técnico cadastrado. Use Cadastrar técnico para criar a primeira conta."
+            />
+          </Panel>
+          {selected && !selected.master && (
+            <>
+              <Panel title={'Cadastro de ' + selected.name}>
+                <ActionForm
+                  key={selected.id + selected.name + selected.active}
+                  submit="Salvar cadastro"
+                  onSave={async (p) => {
+                    const { error } = await db.rpc('ssma_master', {
+                      action: 'edit_technician',
+                      p: {
+                        technician: selected.id,
+                        name: p.name,
+                        active: p.status === 'Ativo',
+                        previous_name: selected.name,
+                        previous_active: selected.active,
+                      },
+                    })
+                    if (error) throw error
+                    await reload()
+                    setNotice('Cadastro atualizado.')
+                  }}
+                >
+                  <Field
+                    label="Nome do técnico"
+                    name="name"
+                    required
+                    maxLength={120}
+                    defaultValue={selected.name}
+                  />
+                  <Select
+                    label="Acesso ao sistema"
+                    name="status"
+                    required
+                    options={['Ativo', 'Inativo']}
+                    defaultValue={selected.active ? 'Ativo' : 'Inativo'}
+                  />
+                </ActionForm>
+              </Panel>
+              <Panel title="Permissões por técnico">
+                <Permissions key={selected.id} person={selected} db={db} reload={reload} />
+              </Panel>
+            </>
+          )}
+        </>
+      ) : (
+        <>
+          <Panel
+            title="Indicadores de SSMA"
+            action={
+              <button className="secondary" onClick={reload}>
+                Atualizar
+              </button>
+            }
+          >
+            <div className="epi-filters">
+              <Select
+                label="Técnico de segurança"
+                placeholder="Todos os responsáveis"
+                options={people.map((p) => [p.id, p.name])}
+                value={tech}
+                onChange={(e) => {
+                  setTech(e.target.value)
+                  setUf('')
+                  setEdit(e.target.value)
+                }}
+              />
+              <Select
+                label="Estado"
+                placeholder="Todos os estados"
+                options={[...new Set(projects.map((p) => p.state))].sort()}
+                value={uf}
+                onChange={(e) => setUf(e.target.value)}
+              />
             </div>
-          ))}
-        </div>
-      </Panel>
-      <Panel title="Projetos por estado">
-        <Table
-          headers={['Estado', 'Projeto', 'Técnico responsável']}
-          rows={projects
-            .filter((p) => !uf || p.state === uf)
-            .map((p) => [p.state, p.project, people.find((t) => t.id === p.tech)?.name])}
-          empty="Nenhum projeto vinculado para esta seleção."
-        />
-      </Panel>
-      <Panel title="Permissões por técnico">
-        <Select
-          label="Editar permissões de"
-          placeholder="Selecione um técnico"
-          options={people.filter((p) => !p.master).map((p) => [p.id, p.name])}
-          value={selected?.master ? '' : edit}
-          onChange={(e) => setEdit(e.target.value)}
-        />
-        {selected && !selected.master && (
-          <Permissions key={selected.id} person={selected} db={db} reload={reload} />
-        )}
-        {!people.some((p) => !p.master) && (
-          <p className="epi-help">Ainda não há perfis de técnicos cadastrados.</p>
-        )}
-      </Panel>
-      <Panel title="Acidentes e incidentes">
-        <p className="epi-help">Evolução mensal nos últimos 12 meses</p>
-        <div className="chart-legend">
-          <span>
-            <i />
-            Acidentes
-          </span>
-          <span>
-            <i className="gray-dot" />
-            Incidentes
-          </span>
-        </div>
-        <Trend rows={rows} demo={false} />
-      </Panel>
-      <Panel title="Conformidade por área">
-        <Table
-          headers={['Área', 'Registros concluídos ou ativos']}
-          rows={groups.map((g) => [
-            g.name,
-            percentage(rows.filter((r) => g.items.some(([id]) => id === r.module))),
-          ])}
-        />
-      </Panel>
-      <Panel title="Indicadores rápidos">
-        <Table
-          headers={['Indicador', 'Percentual']}
-          rows={[
-            ['Exames concluídos', 'exames'],
-            ['EPIs entregues', 'epis'],
-            ['Treinamentos concluídos', 'treinamentos'],
-            ['Resíduos destinados', 'residuos'],
-          ].map(([label, id]) => [label, percentage(rows.filter((r) => r.module === id))])}
-        />
-      </Panel>
+            <div className="kpi-grid">
+              {metrics.map(([label, I], i) => (
+                <div className="card kpi" key={label}>
+                  <span className="tile">
+                    <I size={20} />
+                  </span>
+                  <span>{label}</span>
+                  <strong>{totals[i]}</strong>
+                </div>
+              ))}
+            </div>
+          </Panel>
+          <Panel title="Projetos por estado">
+            <Table
+              headers={['Estado', 'Projeto', 'Técnico responsável']}
+              rows={projects
+                .filter((p) => !uf || p.state === uf)
+                .map((p) => [p.state, p.project, people.find((t) => t.id === p.tech)?.name])}
+              empty="Nenhum projeto vinculado para esta seleção."
+            />
+          </Panel>
+          <Panel title="Acidentes e incidentes">
+            <p className="epi-help">Evolução mensal nos últimos 12 meses</p>
+            <div className="chart-legend">
+              <span>
+                <i />
+                Acidentes
+              </span>
+              <span>
+                <i className="gray-dot" />
+                Incidentes
+              </span>
+            </div>
+            <Trend rows={rows} demo={false} />
+          </Panel>
+          <Panel title="Conformidade por área">
+            <Table
+              headers={['Área', 'Registros concluídos ou ativos']}
+              rows={groups.map((g) => [
+                g.name,
+                percentage(rows.filter((r) => g.items.some(([id]) => id === r.module))),
+              ])}
+            />
+          </Panel>
+          <Panel title="Indicadores rápidos">
+            <Table
+              headers={['Indicador', 'Percentual']}
+              rows={[
+                ['Exames concluídos', 'exames'],
+                ['EPIs entregues', 'epis'],
+                ['Treinamentos concluídos', 'treinamentos'],
+                ['Resíduos destinados', 'residuos'],
+              ].map(([label, id]) => [label, percentage(rows.filter((r) => r.module === id))])}
+            />
+          </Panel>
+        </>
+      )}
     </div>
   )
 }

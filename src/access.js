@@ -9,7 +9,7 @@ export const epiSections = {
   'Registros anteriores': 'anteriores',
 }
 export function permitted(profile, key) {
-  if (!profile) return false
+  if (!profile || profile.active === false) return false
   return profile.is_master === true || (profile.permissions || []).includes(key)
 }
 export function canOpen(profile, key) {
