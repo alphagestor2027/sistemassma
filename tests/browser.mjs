@@ -14,13 +14,13 @@ await page.route('https://gotofoqjtjaeuicfqluo.supabase.co/**',async route=>{con
  if(url.pathname.endsWith('/token')){if(body.password==='ui-test-password')data={access_token:token,refresh_token:'mock-refresh-token',expires_in:3600,token_type:'bearer',user};else{status=400;data={code:'invalid_credentials',msg:'Invalid login credentials'}}}
  else if(url.pathname.endsWith('/ssma_epi_workspace'))data={regions:[],materials:[],assignments:[],requests:[],movements:[],rules:[],assets:[]};
  else if(url.pathname.endsWith('/ssma_epi_dashboard'))data=[];
- else if(url.pathname.endsWith('/ssma_profiles'))data={permissions:['colaboradores','residuos','epi.estoque','epi.anteriores'],user_id:id,username:'cesar',display_name:'César Nascimento'};
+ else if(url.pathname.endsWith('/ssma_profiles'))data={coverage:['DF','SP'],permissions:['colaboradores','residuos','epi.estoque','epi.anteriores'],user_id:id,username:'cesar',display_name:'César Nascimento'};
  else if(url.pathname.endsWith('/ssma_records')){if(req.method()==='POST'){const r={...body,id:'22222222-2222-4222-8222-222222222222',created_at:new Date().toISOString()};records.push(r);data=[{id:r.id}]}else if(req.method()==='PATCH'){records=records.map(r=>({...r,...body}));data=[{id:records[0].id}]}else if(req.method()==='DELETE'){data=records.map(r=>({id:r.id}));records=[]}else data=records;}
  else if(url.pathname.endsWith('/user'))data=user;
  await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
 });
 try{
-await page.goto('http://127.0.0.1:5173');await page.getByRole('heading',{name:'Acesse sua conta'}).waitFor();assert.equal(await page.getByText('Criar conta',{exact:true}).count(),0);
+await page.goto(process.env.APP_URL || 'http://127.0.0.1:5173');await page.getByRole('heading',{name:'Acesse sua conta'}).waitFor();assert.equal(await page.getByText('Criar conta',{exact:true}).count(),0);
 await page.screenshot({path:'test-results/login-desktop.png',fullPage:true});
 await page.locator('[name=username]').fill('cesar');await page.locator('[name=password]').fill('wrong');await page.getByRole('button',{name:'Entrar no sistema',exact:true}).click();await page.getByRole('alert').waitFor();
 await page.locator('[name=password]').fill('ui-test-password');await page.getByRole('button',{name:'Entrar no sistema',exact:true}).click();await page.getByRole('heading',{name:'Dashboard Geral',exact:true}).waitFor();
@@ -29,6 +29,32 @@ await page.getByRole('button',{name:'Gestão de EPIs',exact:true}).click();await
 await page.getByRole('button',{name:'Editar Capacete de segurança - teste'}).click();await page.locator('[name=status]').selectOption('Concluído');await page.getByRole('button',{name:'Salvar registro'}).click();await page.getByRole('cell',{name:'Concluído',exact:true}).waitFor();assert.equal(records[0].status,'Concluído');
 await page.getByRole('button',{name:'Excluir Capacete de segurança - teste'}).click();await page.getByRole('button',{name:'Excluir registro',exact:true}).click();await page.getByRole('heading',{name:'Comece por um novo registro'}).waitFor();assert.equal(records.length,0);
 await page.getByRole('button',{name:'Dashboard Geral',exact:true}).click();await page.getByLabel('Buscar no sistema').fill('resíduos');await page.getByRole('heading',{name:'Resultados da busca'}).waitFor();await page.getByRole('button',{name:'Gestão de Resíduos',exact:true}).last().click();await page.getByRole('heading',{name:'Gestão de Resíduos',exact:true}).waitFor();
+await page.getByRole('button',{name:'Colaboradores',exact:true}).click()
+await page.getByRole('button',{name:'Novo registro',exact:true}).first().click()
+const employeeDialog=page.getByRole('dialog')
+await employeeDialog.getByLabel('Colaborador',{exact:true}).fill('Funcionária de teste')
+await employeeDialog.getByLabel('Data de admissão').fill('2026-09-01')
+for(const [label,value] of Object.entries({'Cargo':'Eletricista','Matrícula':'00045','CPF':'00000000000','E-mail':'teste@example.com','Empresa':'Empresa de teste','Coordenador':'Coordenação A','Gerência':'Gerência A','Técnico de segurança responsável':'Técnico de teste','Projeto':'Projeto A'})){
+  await employeeDialog.getByLabel(label,{exact:true}).fill(value)
+}
+await employeeDialog.getByLabel('UF',{exact:true}).selectOption('DF')
+assert.equal(await employeeDialog.getByLabel('Região',{exact:true}).inputValue(),'Centro-Oeste')
+for(const label of ['NR 06','NR 10 Básica','SEP','NR 12','NR 18','NR 20']){
+  await employeeDialog.getByLabel('Status · '+label,{exact:true}).selectOption('Ativo')
+  await employeeDialog.getByLabel('Data da última certificação · '+label,{exact:true}).fill('2026-09-02')
+  await employeeDialog.getByLabel('Observações · '+label,{exact:true}).fill('Observação '+label)
+}
+await employeeDialog.getByRole('button',{name:'Salvar registro'}).click()
+await page.getByRole('button',{name:'Editar Funcionária de teste'}).click()
+assert.equal(await employeeDialog.getByLabel('Matrícula').inputValue(),'00045')
+assert.equal(await employeeDialog.getByLabel('CPF').inputValue(),'000.000.000-00')
+assert.equal(await employeeDialog.getByLabel('Observações · NR 20').inputValue(),'Observação NR 20')
+await employeeDialog.getByLabel('Desligado').check()
+await employeeDialog.getByLabel('Status · SEP',{exact:true}).selectOption('Suspenso')
+await employeeDialog.getByRole('button',{name:'Salvar registro'}).click()
+await page.getByRole('cell',{name:'Inativo',exact:true}).waitFor()
+assert.equal(records[0].details.certifications.sep.status,'Suspenso')
+assert.equal(records[0].details.admission,'2026-09-01')
 await page.setViewportSize({width:390,height:844});await page.getByRole('button',{name:'Abrir menu'}).click();await page.getByRole('button',{name:'Dashboard Geral',exact:true}).click();await page.getByRole('button',{name:'Visualizar demonstração'}).click();await page.screenshot({path:'test-results/dashboard-mobile.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth),'No mobile overflow');
 await page.getByRole('button',{name:'Abrir menu'}).click();await page.getByRole('button',{name:'Sair do sistema'}).click();await page.getByRole('heading',{name:'Acesse sua conta'}).waitFor();await page.screenshot({path:'test-results/login-mobile.png',fullPage:true});assert.ok(await page.evaluate(()=>document.documentElement.scrollWidth<=window.innerWidth));assert.deepEqual(errors,[]);console.log('PASS: login, invalid password, navigation, CRUD, search, demo, mobile, logout. HTTP calls mocked; backend verified separately.');
 }finally{await browser.close()}
