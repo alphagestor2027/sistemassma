@@ -1,4 +1,5 @@
 import React, { useState } from 'react'
+import { CaResult, useCaLookup } from './CaCatalog'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { available, variant, regionLabel, states, forecast, money } from './epiData'
 import { dateLabel, today } from './data'
@@ -71,12 +72,28 @@ export function Regions({ data, employees, profile, save }) {
   )
 }
 
-export function Stock({ data, profile, save }) {
+export function Stock({ db, data, profile, save }) {
   const [noCA, setNoCA] = useState(false),
     [region, setRegion] = useState(''),
     [search, setSearch] = useState(''),
     [show, setShow] = useState('')
   const owned = data.regions.filter((r) => r.owner_id === profile.user_id)
+  const [ca, setCa] = useState(''),
+    [name, setName] = useState(null),
+    [ficha, setFicha] = useState(0)
+  const stockCa = !show && /^\d{1,70}$/.test(search.trim()) ? search.trim() : ''
+  const lookup = useCaLookup(db, show === 'lookup' || (show === 'new' && !noCA) ? ca : stockCa)
+  const suggested = lookup?.records?.[ficha]?.equipamento || ''
+  function changeCa(value) {
+    setCa(value)
+    setFicha(0)
+  }
+  function open(mode) {
+    setShow(show === mode ? '' : mode)
+    setNoCA(false)
+    changeCa('')
+    setName(null)
+  }
   const regionalOptions = owned.map((r) => [r.id, regionLabel(r)])
   const materialOptions = data.materials.map((m) => [
     m.id,
@@ -98,15 +115,31 @@ export function Stock({ data, profile, save }) {
         title="Estoque de materiais"
         action={
           <div className="button-group">
-            <button className="secondary" onClick={() => setShow(show === 'entry' ? '' : 'entry')}>
+            <button className="secondary" onClick={() => open('lookup')}>
+              Consultar CA
+            </button>
+            <button className="secondary" onClick={() => open('entry')}>
               Registrar entrada
             </button>
-            <button className="primary" onClick={() => setShow(show === 'new' ? '' : 'new')}>
+            <button className="primary" onClick={() => open('new')}>
               Cadastrar material
             </button>
           </div>
         }
       >
+        {show === 'lookup' && (
+          <div className="ca-search">
+            <Field
+              label="Número do CA"
+              type="search"
+              inputMode="numeric"
+              maxLength={70}
+              value={ca}
+              onChange={(e) => changeCa(e.target.value)}
+            />
+            <CaResult result={lookup} index={ficha} onSelect={setFicha} onRegister={() => setShow('new')} />
+          </div>
+        )}
         {show === 'new' && (
           <ActionForm
             submit="Salvar material"
@@ -116,12 +149,29 @@ export function Stock({ data, profile, save }) {
               setShow('')
             }}
           >
-            <Field label="Nome do material" name="name" required maxLength={200} />
-            <Field label="CA" name="ca" required={!noCA} disabled={noCA} maxLength={70} />
+            <Field
+              label="Nome do material"
+              name="name"
+              value={name ?? suggested.slice(0, 200)}
+              onChange={(e) => setName(e.target.value)}
+              required
+              maxLength={200}
+            />
+            <Field
+              label="CA"
+              name="ca"
+              value={noCA ? '' : ca}
+              onChange={(e) => changeCa(e.target.value)}
+              inputMode="numeric"
+              required={!noCA}
+              disabled={noCA}
+              maxLength={70}
+            />
             <label className="epi-check">
               <input type="checkbox" checked={noCA} onChange={(e) => setNoCA(e.target.checked)} />
               Material sem CA
             </label>
+            {!noCA && <CaResult result={lookup} index={ficha} onSelect={setFicha} />}
             <Field label="Valor unitário (R$)" name="price" type="number" min="0" step="0.01" />
             <Field label="Quantidade" name="qty" {...numberProps} />
             <Field label="Validade" name="expiry" type="date" />
@@ -189,7 +239,10 @@ export function Stock({ data, profile, save }) {
             label="Buscar material ou CA"
             type="search"
             value={search}
-            onChange={(e) => setSearch(e.target.value)}
+            onChange={(e) => {
+              setSearch(e.target.value)
+              if (!show) setFicha(0)
+            }}
           />
           <Select
             label="Filtrar estoque"
@@ -209,6 +262,19 @@ export function Stock({ data, profile, save }) {
             ])}
           />
         </div>
+        {stockCa && (
+          <CaResult
+            result={lookup}
+            index={ficha}
+            onSelect={setFicha}
+            onRegister={() => {
+              setCa(stockCa)
+              setName(null)
+              setNoCA(false)
+              setShow('new')
+            }}
+          />
+        )}
         <Table
           headers={[
             'Material / grade',

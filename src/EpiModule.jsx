@@ -110,7 +110,7 @@ export default function EpiModule({ db, profile, employees, children, initialTab
           !error && <p className="notice">Carregando o módulo de EPI…</p>
         ) : (
           <>
-            {tab === 'Estoque' && <Stock {...props} />}{' '}
+            {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
             {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
             {tab === 'Financeiro' && <Finance {...props} />}
             {tab === 'Ficha digital' && <Sheet {...props} />}{' '}

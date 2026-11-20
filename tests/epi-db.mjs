@@ -57,10 +57,16 @@ export async function epiFixture() {
       'utf8',
     ),
   )
+  await pg.exec(
+    await readFile(new URL('../supabase/migrations/20261120104355_catalogo_ca.sql', import.meta.url), 'utf8'),
+  )
   const call = (actor, name, body = {}) =>
     pg.transaction(async (tx) => {
       await tx.exec(actor ? 'set local role authenticated' : 'set local role anon')
       await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [actor || ''])
+      if (name === 'ssma_epi_lookup_ca')
+        return (await tx.query('select public.ssma_epi_lookup_ca($1) as records', [body.numero])).rows[0]
+          .records
       if (name === 'ssma_epi_dashboard')
         return (await tx.query('select * from public.ssma_epi_dashboard()')).rows
       if (!['ssma_epi_workspace', 'ssma_epi_manage', 'ssma_epi_portal', 'ssma_master'].includes(name))

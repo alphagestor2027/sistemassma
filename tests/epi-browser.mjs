@@ -100,7 +100,28 @@ try {
   await admin.getByRole('cell', { name: 'Ana Silva', exact: true }).waitFor()
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()
-  await button(admin, 'Cadastrar material').click()
+  await pg.query("insert into ssma_epi.ca_catalog(ca,fichas) values ('111',$1)", [
+    JSON.stringify([
+      {
+        equipamento: 'LUVA ISOLANTE',
+        fabricante: 'Fabricante de teste',
+        validade: '01/11/2027',
+        situacao: 'VÁLIDO',
+        laudos: [{ norma: 'Norma de teste' }],
+      },
+    ]),
+  ])
+  await button(admin, 'Consultar CA').click()
+  await admin.getByLabel('Número do CA').fill('99999999')
+  await admin.getByText(/99999999 não encontrado/).waitFor()
+  await admin.getByLabel('Número do CA').fill('111')
+  await admin.getByText('Fabricante de teste', { exact: true }).waitFor()
+  await button(admin, 'Usar no cadastro de material').click()
+  assert.equal(await admin.getByLabel('CA', { exact: true }).inputValue(), '111')
+  assert.equal(await admin.getByLabel('Nome do material').inputValue(), 'LUVA ISOLANTE')
+  assert.equal(await admin.getByLabel('Validade', { exact: true }).inputValue(), '')
+  await admin.getByLabel('CA', { exact: true }).fill('000111')
+  await admin.getByRole('heading', { name: 'CA 111 · LUVA ISOLANTE' }).waitFor()
   await admin.getByRole('combobox', { name: 'Cor', exact: true }).selectOption('Azul')
   await admin.getByRole('combobox', { name: 'Cor', exact: true }).selectOption('')
   await admin.getByLabel('Nome do material').fill('Luva isolante')

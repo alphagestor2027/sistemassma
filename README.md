@@ -55,3 +55,10 @@ Autenticação real e acesso pela REST API foram verificados separadamente no Su
 Sistema publicado em https://sistemassma.vercel.app. Projeto Vercel `prj_B9EAK0sqHY9MGvGhY416iISDAaZO`, equipe `team_lBuKO6hVlkrugW1xRe1eE8N1`. Publicação inicial `dpl_FtUXZS3mbrPLkW1efPmKRmnQe4Uh`, validada como READY e HTTP 200.
 
 Conta solicitada: contatoalphagestor@gmail.com. Repositório oficial: https://github.com/alphagestor2027/sistemassma, branch principal `main`. Os arquivos da aplicação ficam na raiz do repositório. O banco permanece no projeto Supabase indicado acima.
+
+### Catálogo de Certificados de Aprovação
+
+Em **Gestão de EPIs → Estoque → Consultar CA**, digite o número do certificado. O cadastro de material também consulta o CA e sugere o nome do equipamento. O campo de validade do estoque refere-se ao material. A validade do certificado e a situação informada no arquivo aparecem na ficha da consulta.
+
+A fonte é o arquivo fornecido `Banco de Dados de CA.csv`, em UTF-8, separado por ponto e vírgula. A consulta reflete a versão importada. Para converter outra exportação do mesmo formato, execute `python scripts/import-ca.py "Banco de Dados de CA.csv" catalogo.jsonl`. O arquivo gerado contém um objeto por CA, com suas fichas e laudos. A tabela privada `ssma_epi.ca_catalog` recebe as colunas `ca` e `fichas`. A função `ssma_epi_lookup_ca` consulta o número exato com a permissão de estoque.
+
