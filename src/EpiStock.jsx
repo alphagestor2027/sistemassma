@@ -127,7 +127,30 @@ export function Stock({ data, profile, save }) {
             <Field label="Validade" name="expiry" type="date" />
             <Field label="Quantidade mínima" name="minimum" {...numberProps} />
             <Field label="Tamanho / numeração" name="size" />
-            <Field label="Cor" name="color" />
+            <Select
+              label="Cor"
+              name="color"
+              placeholder="Selecione a cor"
+              options={[
+                'Amarelo',
+                'Azul',
+                'Azul-marinho',
+                'Bege',
+                'Branco',
+                'Cinza',
+                'Incolor',
+                'Laranja',
+                'Marrom',
+                'Multicolorido',
+                'Preto',
+                'Rosa',
+                'Roxo',
+                'Verde',
+                'Vermelho',
+                'Vinho',
+                'Outra',
+              ]}
+            />
             <Field
               label="Centro de custo do estoque"
               name="stock_center"

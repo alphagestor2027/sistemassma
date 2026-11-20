@@ -3,7 +3,7 @@ import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
 import { epiFixture } from './epi-db.mjs'
 
-const { pg, owner, employee, call } = await epiFixture()
+const { pg, owner, tech, employee, call } = await epiFixture()
 const installed = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
 const browser = await chromium.launch({
   executablePath: process.env.CHROME_PATH || (existsSync(installed) ? installed : undefined),
@@ -62,6 +62,7 @@ async function client(actor) {
   return page
 }
 try {
+  await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
   const admin = await client(owner)
   admin.on('pageerror', (e) => console.error(e.message))
   await admin.goto(base)
@@ -82,6 +83,8 @@ try {
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()
   await button(admin, 'Cadastrar material').click()
+  await admin.getByRole('combobox', { name: 'Cor', exact: true }).selectOption('Azul')
+  await admin.getByRole('combobox', { name: 'Cor', exact: true }).selectOption('')
   await admin.getByLabel('Nome do material').fill('Luva isolante')
   await admin.getByLabel('CA', { exact: true }).fill('111')
   await admin.getByLabel('Valor unitário (R$)', { exact: true }).fill('30')
@@ -135,6 +138,21 @@ try {
   await portal.getByLabel('Nome do colaborador').selectOption(employee)
   await portal.getByLabel('Estado', { exact: true }).selectOption('DF')
   await portal.getByRole('cell', { name: 'Entregue', exact: true }).waitFor()
+  await button(admin, 'Painel Master').click()
+  await admin.getByLabel('Técnico de segurança', { exact: true }).selectOption(owner)
+  await admin.getByLabel('Estado', { exact: true }).selectOption('DF')
+  await admin.getByRole('cell', { name: 'Projeto Norte', exact: true }).waitFor()
+  await admin.getByLabel('Editar permissões de').selectOption(tech)
+  await admin.getByLabel('EPI · Estoque', { exact: true }).uncheck()
+  await button(admin, 'Salvar permissões').click()
+  await admin.getByText('Permissões salvas.', { exact: true }).waitFor()
+  const updated = (await pg.query('select permissions from public.ssma_profiles where user_id=$1', [tech]))
+    .rows[0]
+  assert.ok(!updated.permissions.includes('epi.estoque'))
+  if (process.env.MASTER_SCREENSHOT) {
+    await admin.setViewportSize({ width: 1600, height: 1050 })
+    await admin.screenshot({ path: process.env.MASTER_SCREENSHOT, fullPage: true })
+  }
   assert.deepEqual(failures, [])
   console.log(
     'PASS: vinculação, estoque, portal individual em celular, entrega, financeiro, ficha de impressão e ensaio com SQL real em banco isolado.',

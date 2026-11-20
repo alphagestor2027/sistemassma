@@ -28,13 +28,16 @@ export async function epiFixture() {
     "insert into public.ssma_records(id,owner_id,module,title,unit,status,details) values ($1,$2,'colaboradores','Ana Silva','Projeto Norte','Ativo',jsonb_build_object('extra','Eletricista'))",
     [employee, owner],
   )
+  await pg.exec(
+    await readFile(new URL('../supabase/migrations/20261120015613_ssma_master.sql', import.meta.url), 'utf8'),
+  )
   const call = (actor, name, body = {}) =>
     pg.transaction(async (tx) => {
       await tx.exec(actor ? 'set local role authenticated' : 'set local role anon')
       await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [actor || ''])
       if (name === 'ssma_epi_dashboard')
         return (await tx.query('select * from public.ssma_epi_dashboard()')).rows
-      if (!['ssma_epi_workspace', 'ssma_epi_manage', 'ssma_epi_portal'].includes(name))
+      if (!['ssma_epi_workspace', 'ssma_epi_manage', 'ssma_epi_portal', 'ssma_master'].includes(name))
         throw Error('RPC desconhecida')
       const args = name === 'ssma_epi_workspace' ? [] : [body.action, JSON.stringify(body.p)]
       return (

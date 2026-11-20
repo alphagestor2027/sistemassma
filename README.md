@@ -38,6 +38,10 @@ Pedidos reservam saldo disponível. O técnico responsável confirma a entrega e
 
 O esquema inicial está em `database/schema.sql` e as migrações de EPI em `supabase/migrations/`. Em uma nova instalação, aplique o esquema inicial e depois as migrações em ordem de versão.
 
+## Administração Master
+
+O Master inicial é o perfil existente de César. O acesso a `/adminmaster` exige autenticação. O painel consolida indicadores e permite filtrar por responsável e estado. Em **Permissões por técnico**, selecione um perfil autorizado, marque os módulos e salve. Cada seção de EPI tem permissão própria. Novos perfis começam sem módulos liberados. Atribuições por regional e as políticas por proprietário continuam valendo dentro de cada módulo.
+
 ## Validação
 
 `npm test` verifica cálculos e proteção contra fórmulas em CSV. `node tests/browser.mjs` verifica a interface com HTTP simulado: login inválido/válido, CRUD, busca, demonstração, logout e ausência de transbordamento no celular. O teste usa Chrome instalado no Windows; ajuste o caminho para outro ambiente.
@@ -48,6 +52,6 @@ Autenticação real e acesso pela REST API foram verificados separadamente no Su
 
 ## Integrações
 
-Sistema publicado em https://sistema-ssma-2.vercel.app. Projeto Vercel `prj_B9EAK0sqHY9MGvGhY416iISDAaZO`, equipe `team_lBuKO6hVlkrugW1xRe1eE8N1`. Publicação inicial `dpl_FtUXZS3mbrPLkW1efPmKRmnQe4Uh`, validada como READY e HTTP 200.
+Sistema publicado em https://sistemassma.vercel.app. Projeto Vercel `prj_B9EAK0sqHY9MGvGhY416iISDAaZO`, equipe `team_lBuKO6hVlkrugW1xRe1eE8N1`. Publicação inicial `dpl_FtUXZS3mbrPLkW1efPmKRmnQe4Uh`, validada como READY e HTTP 200.
 
 Conta solicitada: contatoalphagestor@gmail.com. Repositório oficial: https://github.com/alphagestor2027/sistemassma, branch principal `main`. Os arquivos da aplicação ficam na raiz do repositório. O banco permanece no projeto Supabase indicado acima.

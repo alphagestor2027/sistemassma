@@ -14,6 +14,7 @@ import { Stock, Regions, Planning } from './EpiStock'
 import { Requests, Finance, Sheet, Tests } from './EpiOperations'
 import { rpc } from './EpiShared'
 import './epi.css'
+import { epiSections, permitted } from './access'
 
 const tabs = [
   ['Estoque', Boxes],
@@ -26,23 +27,25 @@ const tabs = [
   ['Registros anteriores', Archive],
 ]
 export default function EpiModule({ db, profile, employees, children, initialTab = 'Estoque', onChange }) {
-  const [tab, setTab] = useState(initialTab),
+  const [selected, setTab] = useState(initialTab),
     [data, setData] = useState(null),
     [error, setError] = useState(''),
     [message, setMessage] = useState('')
+  const visible = tabs.filter(([label]) => permitted(profile, 'epi.' + epiSections[label]))
+  const tab = visible.some(([label]) => label === selected) ? selected : visible[0]?.[0]
   const revision = useRef(0)
   const refresh = useCallback(async () => {
     const version = ++revision.current
     try {
       const next = await rpc(db, 'workspace', {})
       if (version !== revision.current) return
-      if (!next) throw new Error('Perfil sem acesso ao módulo de EPI.')
+      if (!next && tab !== 'Registros anteriores') throw new Error('Perfil sem acesso ao módulo de EPI.')
       setData(next)
       setError('')
     } catch (e) {
       if (version === revision.current) setError(e.message)
     }
-  }, [db])
+  }, [db, tab])
   useEffect(() => {
     refresh()
     window.addEventListener('focus', refresh)
@@ -70,7 +73,7 @@ export default function EpiModule({ db, profile, employees, children, initialTab
     <div className="epi">
       <div className="epi-bar">
         <nav aria-label="Seções de EPI">
-          {tabs.map(([name, I]) => (
+          {visible.map(([name, I]) => (
             <button
               key={name}
               className={tab === name ? 'selected' : ''}

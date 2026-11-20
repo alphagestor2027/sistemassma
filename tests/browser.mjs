@@ -14,7 +14,7 @@ await page.route('https://gotofoqjtjaeuicfqluo.supabase.co/**',async route=>{con
  if(url.pathname.endsWith('/token')){if(body.password==='ui-test-password')data={access_token:token,refresh_token:'mock-refresh-token',expires_in:3600,token_type:'bearer',user};else{status=400;data={code:'invalid_credentials',msg:'Invalid login credentials'}}}
  else if(url.pathname.endsWith('/ssma_epi_workspace'))data={regions:[],materials:[],assignments:[],requests:[],movements:[],rules:[],assets:[]};
  else if(url.pathname.endsWith('/ssma_epi_dashboard'))data=[];
- else if(url.pathname.endsWith('/ssma_profiles'))data={user_id:id,username:'cesar',display_name:'César Nascimento'};
+ else if(url.pathname.endsWith('/ssma_profiles'))data={permissions:['colaboradores','residuos','epi.estoque','epi.anteriores'],user_id:id,username:'cesar',display_name:'César Nascimento'};
  else if(url.pathname.endsWith('/ssma_records')){if(req.method()==='POST'){const r={...body,id:'22222222-2222-4222-8222-222222222222',created_at:new Date().toISOString()};records.push(r);data=[{id:r.id}]}else if(req.method()==='PATCH'){records=records.map(r=>({...r,...body}));data=[{id:records[0].id}]}else if(req.method()==='DELETE'){data=records.map(r=>({id:r.id}));records=[]}else data=records;}
  else if(url.pathname.endsWith('/user'))data=user;
  await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
