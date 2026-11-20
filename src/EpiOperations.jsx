@@ -1,0 +1,393 @@
+import React, { useState } from 'react'
+import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
+import { money, variant, regionLabel, expenseGroups, stamp, nextStatus } from './epiData'
+import { today, dateLabel } from './data'
+
+export function Requests({ data, profile, save, refresh }) {
+  const [status, setStatus] = useState(''),
+    [region, setRegion] = useState('')
+  const list = data.requests.filter(
+    (q) => (!status || q.status === status) && (!region || q.region_id === region),
+  )
+  return (
+    <Panel
+      title="Solicitações dos colaboradores"
+      action={
+        <button className="secondary" onClick={refresh}>
+          Atualizar solicitações
+        </button>
+      }
+    >
+      <div className="epi-filters">
+        <Select
+          label="Situação"
+          placeholder="Todas"
+          value={status}
+          onChange={(e) => setStatus(e.target.value)}
+          options={['Solicitado', 'Entregue', 'Cancelado']}
+        />
+        <Select
+          label="Regional"
+          placeholder="Todas as regionais"
+          value={region}
+          onChange={(e) => setRegion(e.target.value)}
+          options={data.regions.map((r) => [r.id, regionLabel(r)])}
+        />
+      </div>
+      {list.map((q) => {
+        const reg = data.regions.find((r) => r.id === q.region_id)
+        return (
+          <article className="epi-request" key={q.id}>
+            <header>
+              <div>
+                <strong>{q.employee}</strong>
+                <small>
+                  {q.project} · {q.state} · {q.job} · {stamp(q.created_at)}
+                </small>
+              </div>
+              <span
+                className={
+                  'badge ' + (q.status === 'Entregue' ? 'green' : q.status === 'Solicitado' ? 'red' : 'gray')
+                }
+              >
+                {q.status}
+              </span>
+            </header>
+            <p>{q.items.map((i) => i.qty + ' × ' + variant(i)).join(', ')}</p>
+            <small>
+              Pedido {q.id.slice(0, 8).toUpperCase()} · Técnico responsável: {reg?.technician || q.technician}
+            </small>
+            {q.status === 'Solicitado' ? (
+              <div className="epi-request-actions">
+                {reg?.technician_id === profile.user_id && (
+                  <ActionForm
+                    submit="Confirmar entrega"
+                    onSave={(p) => save('deliver', { ...p, request_id: q.id })}
+                  >
+                    <Select
+                      label="Lançar despesa em"
+                      name="destination"
+                      placeholder="Confirmar destino do custo"
+                      options={['Projeto', 'SSMA']}
+                      required
+                    />
+                  </ActionForm>
+                )}
+                <details>
+                  <summary>Cancelar solicitação</summary>
+                  <p>A reserva dos materiais será liberada.</p>
+                  <ActionForm
+                    submit="Confirmar cancelamento"
+                    onSave={() => save('cancel', { request_id: q.id })}
+                  />
+                </details>
+              </div>
+            ) : (
+              <small>
+                {q.confirmed_name} · {stamp(q.closed_at)}
+                {q.destination && ' · Custo do ' + q.destination}
+              </small>
+            )}
+          </article>
+        )
+      })}
+      {!list.length && <p className="epi-empty">Nenhuma solicitação para os filtros selecionados.</p>}
+    </Panel>
+  )
+}
+
+export function Finance({ data }) {
+  const [region, setRegion] = useState(''),
+    [project, setProject] = useState(''),
+    [center, setCenter] = useState(''),
+    [contract, setContract] = useState('')
+  const regional = data.requests.filter((q) => !region || q.region_id === region)
+  const movements = data.movements.filter((m) => !region || m.region_id === region)
+  const groups = expenseGroups(regional)
+  const sum = (list, fn) => list.reduce((s, x) => s + fn(x), 0)
+  const movementValue = (kind) =>
+    sum(
+      movements.filter((m) => m.kind === kind),
+      (m) => m.qty * Math.round(Number(m.price) * 100),
+    ) / 100
+  const groupValue = (d) =>
+    sum(
+      groups.filter((g) => g.destination === d),
+      (g) => g.cents,
+    ) / 100
+  const scoped = groups.filter(
+    (g) =>
+      (!project || g.project === project) &&
+      (!center || g.center === center) &&
+      (!contract || g.contract === contract),
+  )
+  return (
+    <>
+      <Panel
+        title="Movimentação financeira"
+        action={
+          <Select
+            label="Regional"
+            placeholder="Todas as regionais"
+            value={region}
+            options={data.regions.map((r) => [r.id, regionLabel(r)])}
+            onChange={(e) => {
+              setRegion(e.target.value)
+              setProject('')
+              setCenter('')
+              setContract('')
+            }}
+          />
+        }
+      >
+        <div className="epi-metrics">
+          {[
+            ['Entradas de material', movementValue('Entrada')],
+            ['Saídas por entrega', movementValue('Saída')],
+            ['Despesas dos projetos', groupValue('Projeto')],
+            ['Custos do SSMA', groupValue('SSMA')],
+          ].map(([label, v]) => (
+            <div key={label}>
+              <small>{label}</small>
+              <strong>{money(v)}</strong>
+            </div>
+          ))}
+        </div>
+      </Panel>
+      <Panel title="Despesas por projeto e material">
+        <div className="epi-filters">
+          {[
+            ['Projeto / unidade', 'project', project, setProject],
+            ['Centro de custo', 'center', center, setCenter],
+            ['Contrato', 'contract', contract, setContract],
+          ].map(([label, k, v, set]) => (
+            <Select
+              key={k}
+              label={label}
+              placeholder="Todos"
+              value={v}
+              options={[...new Set(groups.map((g) => g[k]).filter(Boolean))]}
+              onChange={(e) => set(e.target.value)}
+            />
+          ))}
+        </div>
+        <Table
+          headers={[
+            'Destino do custo',
+            'Projeto atendido',
+            'UF',
+            'Centro de custo',
+            'Contrato',
+            'Material / grade',
+            'Entregue',
+            'Despesa',
+          ]}
+          rows={scoped.map((g) => [
+            g.destination,
+            g.project,
+            g.state,
+            g.center || '—',
+            g.contract || '—',
+            g.material,
+            g.qty,
+            money(g.cents / 100),
+          ])}
+          empty="Nenhuma entrega confirmada para este filtro."
+        />
+        {!!scoped.length && (
+          <p className="epi-total">
+            Total selecionado <strong>{money(sum(scoped, (g) => g.cents) / 100)}</strong>
+          </p>
+        )}
+      </Panel>
+      <Panel title="Extrato de entradas e saídas">
+        <Table
+          headers={['Data', 'Movimento', 'Material', 'Quantidade', 'Valor unitário', 'Valor total']}
+          rows={movements.map((m) => [
+            stamp(m.created_at),
+            m.kind,
+            variant(data.materials.find((i) => i.id === m.material_id)),
+            m.qty,
+            money(m.price),
+            money(m.qty * m.price),
+          ])}
+        />
+      </Panel>
+    </>
+  )
+}
+
+export function Sheet({ data, employees }) {
+  const [id, setId] = useState('')
+  const names = new Map(employees.map((e) => [e.id, e.title]))
+  for (const q of [...data.requests].reverse())
+    if (!names.has(q.employee_id)) names.set(q.employee_id, q.employee)
+  const delivered = data.requests
+    .filter((q) => q.employee_id === id && q.status === 'Entregue')
+    .sort((a, b) => b.closed_at.localeCompare(a.closed_at))
+  return (
+    <>
+      <Panel title="Ficha de EPI digital">
+        <div className="epi-filters">
+          <Select
+            label="Consultar colaborador"
+            value={id}
+            options={[...names].sort((a, b) => a[1].localeCompare(b[1]))}
+            onChange={(e) => setId(e.target.value)}
+          />
+          {id && (
+            <button className="secondary" onClick={() => window.print()}>
+              Imprimir ficha / salvar PDF
+            </button>
+          )}
+        </div>
+      </Panel>
+      {id && (
+        <section className="card epi-panel epi-print">
+          <header>
+            <div>
+              <p className="eyebrow">Sistema SSMA 2.0</p>
+              <h2>Ficha individual de entrega de EPI</h2>
+            </div>
+          </header>
+          <h3>{names.get(id)}</h3>
+          <p className="epi-help">Emissão em {dateLabel(today())}</p>
+          <Table
+            headers={[
+              'Entrega',
+              'Projeto / cargo',
+              'Material',
+              'CA',
+              'Quantidade',
+              'Técnico que confirmou',
+              'Pedido',
+            ]}
+            rows={delivered.flatMap((q) =>
+              q.items.map((i) => [
+                stamp(q.closed_at),
+                q.project + ' / ' + q.state + ' · ' + q.job,
+                variant(i),
+                i.ca || 'Sem CA',
+                i.qty,
+                q.confirmed_name,
+                q.id.slice(0, 8).toUpperCase(),
+              ]),
+            )}
+            empty="Nenhuma entrega confirmada para este colaborador."
+          />
+        </section>
+      )}
+    </>
+  )
+}
+
+export function Tests({ data, save }) {
+  const [delivery, setDelivery] = useState(''),
+    [filter, setFilter] = useState('')
+  const delivered = data.requests.filter((q) => q.status === 'Entregue')
+  const selected = delivered.find((q) => q.id === delivery)
+  const list = data.assets.filter((a) => !filter || a.status === filter)
+  return (
+    <>
+      <Panel title="Vincular equipamento a uma entrega">
+        <ActionForm
+          submit="Registrar equipamento"
+          onSave={(p) => save('asset', p)}
+          onDone={() => setDelivery('')}
+        >
+          <Select
+            label="Entrega confirmada"
+            name="request_id"
+            value={delivery}
+            onChange={(e) => setDelivery(e.target.value)}
+            options={delivered.map((q) => [
+              q.id,
+              q.employee + ' · ' + q.project + ' · ' + stamp(q.closed_at) + ' · ' + q.id.slice(0, 8),
+            ])}
+            required
+          />
+          <Select
+            label="Equipamento entregue"
+            name="material_id"
+            options={(selected?.items || [])
+              .filter(
+                (i) =>
+                  data.assets.filter((a) => a.request_id === delivery && a.material_id === i.material_id)
+                    .length < i.qty,
+              )
+              .map((i) => [i.material_id, variant(i)])}
+            required
+          />
+          <Field label="Número de série / patrimônio" name="serial" required />
+          <Field label="Intervalo de reteste (dias)" name="days" type="number" min={1} required />
+          <Field label="Próximo ensaio" name="due" type="date" required />
+        </ActionForm>
+      </Panel>
+      <Panel
+        title="Logística reversa e ensaios"
+        action={
+          <Select
+            label="Status do equipamento"
+            value={filter}
+            options={Object.keys(nextStatus)}
+            placeholder="Todos"
+            onChange={(e) => setFilter(e.target.value)}
+          />
+        }
+      >
+        {list.map((a) => {
+          const q = delivered.find((q) => q.id === a.request_id)
+          const item = q.items.find((i) => i.material_id === a.material_id)
+          return (
+            <article className="epi-request" key={a.id}>
+              <header>
+                <div>
+                  <strong>
+                    {variant(item)} · Série {a.serial}
+                  </strong>
+                  <small>
+                    {q.employee} · {q.project} · {q.state}
+                  </small>
+                </div>
+                <span className={'badge ' + (a.status === 'Reprovado' ? 'red' : 'gray')}>{a.status}</span>
+              </header>
+              <p className={a.due <= today() ? 'red-text' : ''}>
+                Próximo ensaio em {dateLabel(a.due)} · a cada {a.period_days} dias
+              </p>
+              {nextStatus[a.status]?.length > 0 && <TestForm key={a.status} asset={a} save={save} />}
+              <details>
+                <summary>Histórico do equipamento</summary>
+                <Table
+                  headers={['Data', 'Situação', 'Laboratório', 'Laudo / observação']}
+                  rows={a.history.map((t) => [stamp(t.created_at), t.status, t.lab, t.report || '—'])}
+                  empty="Equipamento em uso. Aguardando o primeiro envio."
+                />
+              </details>
+            </article>
+          )
+        })}
+        {!list.length && <p className="epi-empty">Nenhum equipamento nesta situação.</p>}
+      </Panel>
+    </>
+  )
+}
+function TestForm({ asset, save }) {
+  const destinations = nextStatus[asset.status]
+  return (
+    <ActionForm submit="Registrar movimentação" onSave={(p) => save('test', { ...p, asset_id: asset.id })}>
+      <Select
+        label="Próxima situação"
+        name="status"
+        defaultValue={destinations.length === 1 ? destinations[0] : ''}
+        options={destinations.map((s) => [s, s === 'Em retorno' ? 'Aprovado · iniciar retorno' : s])}
+        required
+      />
+      {asset.status === 'Em uso' && <Field label="Laboratório de destino" name="lab" required />}
+      <Field
+        label={asset.status === 'No laboratório' ? 'Laudo / resultado do ensaio' : 'Observação'}
+        name="report"
+        required={asset.status === 'No laboratório'}
+      />
+    </ActionForm>
+  )
+}
