@@ -1,5 +1,5 @@
 import React, { useState } from 'react'
-import { stockAreas } from './epiData'
+import { regionOf } from './epiData'
 import { today } from './data'
 
 const certificates = [
@@ -18,9 +18,6 @@ const contactFields = [
   ['coordinator', 'Coordenador'],
   ['management', 'Gerência'],
 ]
-function regionOf(uf) {
-  return Object.keys(stockAreas).find((region) => stockAreas[region].split(' ').includes(uf)) || ''
-}
 function formatCpf(value) {
   return value
     .replace(/\D/g, '')

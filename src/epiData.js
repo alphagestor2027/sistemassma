@@ -93,3 +93,7 @@ export const stockAreas = {
   Sudeste: 'ES MG RJ SP',
   Sul: 'PR RS SC',
 }
+
+export function regionOf(uf) {
+  return Object.keys(stockAreas).find((region) => stockAreas[region].split(' ').includes(uf)) || ''
+}
