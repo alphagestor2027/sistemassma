@@ -2,7 +2,8 @@ import React, { useEffect, useState } from 'react'
 import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2 } from 'lucide-react'
 import { modules, groups } from './config'
 import { epiSections } from './access'
-import { indicators, percent } from './data'
+import { recentPeriod, matchesLocation } from './reportFilters'
+import { indicators, percent, today, dateLabel } from './data'
 import { Select, Panel, Table, ActionForm, Field } from './EpiShared'
 import './epi.css'
 
@@ -134,6 +135,9 @@ export default function Master({ db, days, Trend, managing, navigate }) {
   const [data, setData] = useState(null),
     [tech, setTech] = useState(''),
     [uf, setUf] = useState(''),
+    [region, setRegion] = useState(''),
+    [periodChoice, setPeriodChoice] = useState(String(days)),
+    [custom, setCustom] = useState(() => recentPeriod(days, today())),
     [edit, setEdit] = useState(''),
     [creating, setCreating] = useState(false),
     [notice, setNotice] = useState(''),
@@ -209,8 +213,29 @@ export default function Master({ db, days, Trend, managing, navigate }) {
     projects = data.projects.filter((p) => !tech || p.tech === tech),
     selected = people.find((p) => p.id === edit)
   const responsible = people.find((p) => p.id === tech)
-  const rows = data.rows.filter((r) => (!tech || r.techs.includes(tech)) && (!uf || r.states.includes(uf)))
-  const totals = indicators(rows, days)
+  const areas = data.service_areas
+  const regions = Object.keys(areas).sort((a, b) => a.localeCompare(b, 'pt-BR'))
+  const allowedStates = responsible && !responsible.master ? responsible.coverage : null
+  const stateOptions = (region ? areas[region] : Object.values(areas).flat())
+    .filter((state) => !allowedStates || allowedStates.includes(state))
+    .sort()
+  if (!region && projects.some((p) => p.state === 'Sem UF informada')) stateOptions.push('Sem UF informada')
+  const matchesArea = (states) => matchesLocation(states, areas[region], uf, allowedStates)
+  const period = periodChoice === 'custom' ? custom : recentPeriod(Number(periodChoice), today())
+  const validPeriod =
+    /^\d{4}-\d{2}-\d{2}$/.test(period.start) &&
+    /^\d{4}-\d{2}-\d{2}$/.test(period.end) &&
+    period.start <= period.end
+  const rows = validPeriod
+    ? data.rows.filter(
+        (r) =>
+          (!tech || r.techs.includes(tech)) &&
+          matchesArea(r.states) &&
+          r.event_date >= period.start &&
+          r.event_date <= period.end,
+      )
+    : []
+  const totals = indicators(rows, days, today(), period)
   const percentage = (list) => {
     const value = percent(list)
     return value === null ? '—' : value + '%'
@@ -398,18 +423,77 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                 value={tech}
                 onChange={(e) => {
                   setTech(e.target.value)
+                  setRegion('')
                   setUf('')
                   setEdit(e.target.value)
                 }}
               />
               <Select
+                label="Região"
+                placeholder="Todas as regiões"
+                options={regions.filter(
+                  (name) => !allowedStates || areas[name].some((uf) => allowedStates.includes(uf)),
+                )}
+                value={region}
+                onChange={(e) => {
+                  setRegion(e.target.value)
+                  setUf('')
+                }}
+              />
+              <Select
                 label="Estado"
                 placeholder="Todos os estados"
-                options={[...new Set(projects.map((p) => p.state))].sort()}
+                options={stateOptions}
                 value={uf}
                 onChange={(e) => setUf(e.target.value)}
               />
             </div>
+            <div className="epi-filters master-period">
+              <Field label="Período">
+                <select
+                  aria-label="Período"
+                  value={periodChoice}
+                  onChange={(e) => {
+                    if (e.target.value === 'custom') setCustom(period)
+                    setPeriodChoice(e.target.value)
+                  }}
+                >
+                  <option value="7">Últimos 7 dias</option>
+                  <option value="30">Últimos 30 dias</option>
+                  <option value="90">Últimos 90 dias</option>
+                  <option value="365">Últimos 365 dias</option>
+                  <option value="custom">Personalizado</option>
+                </select>
+              </Field>
+              {periodChoice === 'custom' && (
+                <>
+                  <Field
+                    label="Data inicial"
+                    type="date"
+                    value={custom.start}
+                    max={custom.end || undefined}
+                    onChange={(e) => setCustom({ ...custom, start: e.target.value })}
+                  />
+                  <Field
+                    label="Data final"
+                    type="date"
+                    value={custom.end}
+                    min={custom.start || undefined}
+                    onChange={(e) => setCustom({ ...custom, end: e.target.value })}
+                  />
+                </>
+              )}
+            </div>
+            {validPeriod ? (
+              <p className="epi-help">
+                Indicadores por data de registro, de {dateLabel(period.start)} a {dateLabel(period.end)}. Os
+                status e os vencimentos refletem a situação atual.
+              </p>
+            ) : (
+              <p role="alert" className="form-error">
+                Informe as duas datas. A data final deve ser igual ou posterior à inicial.
+              </p>
+            )}
             {responsible && (
               <p className="epi-help">
                 Área de atendimento: {areaSummary(data.service_areas, responsible.coverage)}
@@ -422,22 +506,27 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     <I size={20} />
                   </span>
                   <span>{label}</span>
-                  <strong>{totals[i]}</strong>
+                  <strong>{validPeriod ? totals[i] : '—'}</strong>
                 </div>
               ))}
             </div>
           </Panel>
-          <Panel title="Projetos por estado">
+          <Panel title="Projetos por região e estado">
+            <p className="epi-help">Vínculos atuais da área selecionada.</p>
             <Table
-              headers={['Estado', 'Projeto', 'Técnico responsável']}
+              headers={['Região', 'Estado', 'Projeto', 'Técnico responsável']}
               rows={projects
-                .filter((p) => !uf || p.state === uf)
-                .map((p) => [p.state, p.project, people.find((t) => t.id === p.tech)?.name])}
+                .filter((p) => matchesArea([p.state]))
+                .map((p) => [
+                  regions.find((name) => areas[name].includes(p.state)) || 'Sem região informada',
+                  p.state,
+                  p.project,
+                  people.find((t) => t.id === p.tech)?.name,
+                ])}
               empty="Nenhum projeto vinculado para esta seleção."
             />
           </Panel>
           <Panel title="Acidentes e incidentes">
-            <p className="epi-help">Evolução mensal nos últimos 12 meses</p>
             <div className="chart-legend">
               <span>
                 <i />
@@ -448,7 +537,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                 Incidentes
               </span>
             </div>
-            <Trend rows={rows} demo={false} />
+            {validPeriod && <Trend rows={rows} demo={false} period={period} />}
           </Panel>
           <Panel title="Conformidade por área">
             <Table

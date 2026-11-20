@@ -103,21 +103,23 @@ export default function EpiModule({ db, profile, employees, children, initialTab
           <button onClick={refresh}>Tentar novamente</button>
         </div>
       )}
-      {tab === 'Registros anteriores' ? (
-        children
-      ) : !data || !profile ? (
-        !error && <p className="notice">Carregando o módulo de EPI…</p>
-      ) : (
-        <>
-          {tab === 'Estoque' && <Stock {...props} />}{' '}
-          {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
-          {tab === 'Financeiro' && <Finance {...props} />}
-          {tab === 'Ficha digital' && <Sheet {...props} />}{' '}
-          {tab === 'Ensaios e retornos' && <Tests {...props} />}{' '}
-          {tab === 'Previsão de compras' && <Planning {...props} />}
-          {tab === 'Regionais e vínculos' && <Regions {...props} />}
-        </>
-      )}
+      <div className="epi-tab-content" key={tab}>
+        {tab === 'Registros anteriores' ? (
+          children
+        ) : !data || !profile ? (
+          !error && <p className="notice">Carregando o módulo de EPI…</p>
+        ) : (
+          <>
+            {tab === 'Estoque' && <Stock {...props} />}{' '}
+            {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
+            {tab === 'Financeiro' && <Finance {...props} />}
+            {tab === 'Ficha digital' && <Sheet {...props} />}{' '}
+            {tab === 'Ensaios e retornos' && <Tests {...props} />}{' '}
+            {tab === 'Previsão de compras' && <Planning {...props} />}
+            {tab === 'Regionais e vínculos' && <Regions {...props} />}
+          </>
+        )}
+      </div>
     </div>
   )
 }
