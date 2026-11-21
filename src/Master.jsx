@@ -527,7 +527,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                   regions.find((name) => areas[name].includes(p.state)) || 'Sem região informada',
                   p.state,
                   p.project,
-                  people.find((t) => t.id === p.tech)?.name,
+                  people.find((t) => t.id === p.tech)?.name || 'Sem responsável',
                 ])}
               empty="Nenhum projeto vinculado para esta seleção."
             />
