@@ -29,12 +29,12 @@ function formatCpf(value) {
     .replace(/\.(\d{3})(\d)/, '.$1-$2')
 }
 
-export function employeePayload(form, record, owner) {
+export function employeePayload(form, record, owner, profile) {
   const value = (key) => String(form.get(key) ?? '').trim()
   const details = {
     ...record.details,
     admission: value('admission'),
-    technicianId: value('technicianId') || null,
+    technicianId: profile?.is_master ? value('technicianId') || null : (record.id ? record.details?.technicianId || null : owner),
     extra: value('extra'),
     region: regionOf(value('employee_state')),
   }
@@ -53,7 +53,7 @@ export function employeePayload(form, record, owner) {
     owner_id: owner,
     title: value('title'),
     unit: value('unit'),
-    person: value('person'),
+    person: profile?.is_master ? value('person') : (record.id ? record.person : profile.display_name),
     employee_state: value('employee_state') || null,
     status: form.has('dismissed')
       ? 'Inativo'
@@ -111,7 +111,7 @@ function TechnicianSelect({ db, record }) {
   )
 }
 
-export function EmployeeFields({ record, coverage, db }) {
+export function EmployeeFields({ record, coverage, db, isMaster }) {
   const details = record.details || {}
   const [uf, setUf] = useState(record.employee_state || '')
   const [cpf, setCpf] = useState(formatCpf(details.cpf || ''))
@@ -178,7 +178,7 @@ export function EmployeeFields({ record, coverage, db }) {
           Região
           <input readOnly value={regionOf(uf)} placeholder="Selecione a UF" />
         </label>
-        <TechnicianSelect db={db} record={record} />
+        {isMaster && <TechnicianSelect db={db} record={record} />}
         <label>
           Projeto
           <input name="unit" defaultValue={record.unit} maxLength={120} required />

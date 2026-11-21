@@ -93,6 +93,12 @@ try {
   await admin.locator('[name=password]').fill('local-test')
   await admin.getByRole('button', { name: 'Entrar no sistema' }).click()
   const button = (p, name) => p.getByRole('button', { name, exact: true })
+  await button(admin, 'Colaboradores').click()
+  await button(admin, 'Novo colaborador').first().click()
+  const responsible = admin.getByRole('combobox', { name: 'Técnico de segurança responsável' })
+  await responsible.selectOption(tech)
+  assert.equal(await responsible.inputValue(), tech)
+  await button(admin, 'Cancelar').click()
   await button(admin, 'Gestão de EPIs').click()
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()

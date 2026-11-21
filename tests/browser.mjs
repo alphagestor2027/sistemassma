@@ -13,6 +13,7 @@ await page.route('https://fonts.googleapis.com/**',route=>route.abort());
 await page.route('https://gotofoqjtjaeuicfqluo.supabase.co/**',async route=>{const req=route.request(),url=new URL(req.url()),body=req.postDataJSON();let data={},status=200;
  if(url.pathname.endsWith('/token')){if(body.password==='ui-test-password')data={access_token:token,refresh_token:'mock-refresh-token',expires_in:3600,token_type:'bearer',user};else{status=400;data={code:'invalid_credentials',msg:'Invalid login credentials'}}}
  else if(url.pathname.endsWith('/ssma_epi_workspace'))data={regions:[],materials:[],assignments:[],requests:[],movements:[],rules:[],assets:[]};
+ else if(url.pathname.endsWith('/ssma_epi_technician_gloves'))data=[{employee:'Ana de teste',material:'Luva isolante',state:'DF',qty:2,due:'2020-01-01',rejected:false}];
  else if(url.pathname.endsWith('/ssma_epi_dashboard'))data=[];
  else if(url.pathname.endsWith('/ssma_employee_technicians'))data=[{id:'55555555-5555-4555-8555-555555555555',name:'Técnico de teste'}];
  else if(url.pathname.endsWith('/ssma_profiles'))data={coverage:['DF','SP'],permissions:['colaboradores','residuos','epi.estoque','epi.anteriores'],user_id:id,username:'cesar',display_name:'César Nascimento'};
@@ -25,7 +26,7 @@ await page.goto(process.env.APP_URL || 'http://127.0.0.1:5173');await page.getBy
 await page.screenshot({path:'test-results/login-desktop.png',fullPage:true});
 await page.locator('[name=username]').fill('cesar');await page.locator('[name=password]').fill('wrong');await page.getByRole('button',{name:'Entrar no sistema',exact:true}).click();await page.getByRole('alert').waitFor();
 await page.locator('[name=password]').fill('ui-test-password');await page.getByRole('button',{name:'Entrar no sistema',exact:true}).click();await page.getByRole('heading',{name:'Dashboard Geral',exact:true}).waitFor();
-assert.equal(await page.getByRole('button',{name:'Visualizar demonstração'}).count(),0);assert.equal(await page.getByLabel('Filtrar por unidade').count(),0);await page.screenshot({path:'test-results/dashboard-desktop.png',fullPage:true});
+assert.equal(await page.getByRole('button',{name:'Visualizar demonstração'}).count(),0);assert.equal(await page.getByLabel('Filtrar por unidade').count(),0);await page.getByRole('cell',{name:'Vencida · substituir'}).waitFor();await page.getByRole('cell',{name:'Centro-Oeste · DF'}).waitFor();await page.screenshot({path:'test-results/dashboard-desktop.png',fullPage:true});
 await page.getByRole('button',{name:'Gestão de Resíduos',exact:true}).click();await page.getByRole('button',{name:'Novo registro',exact:true}).first().click();await page.locator('[name=title]').fill('Destinação de resíduos - teste');await page.locator('[name=person]').fill('Colaborador teste');await page.locator('[name=extra]').fill('CA 00000');await page.getByRole('button',{name:'Salvar registro'}).click();await page.getByRole('cell',{name:'Destinação de resíduos - teste'}).first().waitFor();
 await page.getByRole('button',{name:'Editar Destinação de resíduos - teste'}).click();await page.locator('[name=status]').selectOption('Concluído');await page.getByRole('button',{name:'Salvar registro'}).click();await page.getByRole('cell',{name:'Concluído',exact:true}).waitFor();assert.equal(records[0].status,'Concluído');
 await page.getByRole('button',{name:'Excluir Destinação de resíduos - teste'}).click();await page.getByRole('button',{name:'Excluir registro',exact:true}).click();await page.getByRole('heading',{name:'Comece por um novo registro'}).waitFor();assert.equal(records.length,0);
@@ -38,7 +39,7 @@ await employeeDialog.getByLabel('Data de admissão').fill('2026-09-01')
 for(const [label,value] of Object.entries({'Cargo':'Eletricista','Matrícula':'00045','CPF':'00000000000','E-mail':'teste@example.com','Empresa':'Empresa de teste','Setor':'Operações','CNPJ':'00.000.000/0000-00','Coordenador':'Coordenação A','Gerência':'Gerência A','Projeto':'Projeto A'})){
   await employeeDialog.getByLabel(label,{exact:true}).fill(value)
 }
-await employeeDialog.getByRole('combobox',{name:'Técnico de segurança responsável'}).selectOption({label:'Técnico de teste'})
+assert.equal(await employeeDialog.getByLabel('Técnico de segurança responsável').count(),0)
 await employeeDialog.getByLabel('UF',{exact:true}).selectOption('DF')
 assert.equal(await employeeDialog.getByLabel('Região',{exact:true}).inputValue(),'Centro-Oeste')
 for(const label of ['NR 06','NR 10 Básica','SEP','NR 12','NR 18','NR 20']){
@@ -57,8 +58,8 @@ await employeeDialog.getByLabel('Desligado').check()
 await employeeDialog.getByLabel('Status · SEP',{exact:true}).selectOption('Suspenso')
 await employeeDialog.getByRole('button',{name:'Salvar registro'}).click()
 await page.getByRole('cell',{name:'Desligado',exact:true}).waitFor()
-await page.getByRole('cell',{name:'Técnico de teste',exact:true}).waitFor()
-assert.equal(records[0].details.technicianId,'55555555-5555-4555-8555-555555555555')
+await page.getByRole('cell',{name:'César Nascimento',exact:true}).waitFor()
+assert.equal(records[0].details.technicianId,id)
 assert.equal(records[0].details.certifications.sep.status,'Suspenso')
 assert.equal(records[0].details.admission,'2026-09-01')
 const original = records[0]
@@ -75,8 +76,7 @@ await filterPanel.waitFor()
 await page.getByRole('columnheader',{name:'Técnico responsável',exact:true}).waitFor()
 await page.getByRole('button',{name:'Editar Ágata de teste'}).click()
 const responsible = employeeDialog.getByRole('combobox',{name:'Técnico de segurança responsável'})
-await responsible.getByRole('option',{name:'Técnico de teste',exact:true}).waitFor({state:'attached'})
-assert.match(await responsible.locator('option:checked').textContent(),/Responsável anterior/)
+assert.equal(await responsible.count(),0)
 await employeeDialog.getByRole('button',{name:'Cancelar'}).click()
 assert.deepEqual(await names(),['Ágata de teste','Funcionária de teste','Zilda de teste'])
 await filter('Ordem alfabética').selectOption('desc')
