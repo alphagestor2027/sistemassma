@@ -50,7 +50,9 @@ export function Stock({ db, data, profile, save, initialFocus }) {
     changeCa('')
     setName(null)
   }
-  const needsTechnician=profile.is_master && (show==='new' || (editing && !editing.region_id))
+  const [unit,setUnit]=useState('')
+  const units=data.regions.filter(r=>r.distribution_unit).map(r=>[r.id,r.distribution_unit])
+  const needsTechnician=profile.is_master && editing && !editing.region_id
   const [technicians,setTechnicians]=useState(null),[directoryError,setDirectoryError]=useState(''),[retryDirectory,setRetryDirectory]=useState(0)
   React.useEffect(()=>{
     if(!needsTechnician)return
@@ -64,15 +66,16 @@ export function Stock({ db, data, profile, save, initialFocus }) {
     [manualGlove, setManualGlove] = useState(false)
   const detected = /luva.*isolante/i.test(name || '') || /luva.*isolante/i.test(suggested)
   const glove = detected || manualGlove
-  const materialOptions = data.materials.map((m) => [
+  const scopedMaterials=data.materials.filter(m=>!profile.is_master||!unit||m.region_id===unit)
+  const materialOptions = scopedMaterials.map((m) => [
     m.id,
     variant(m) + ' · ' + regionLabel(data.regions.find((r) => r.id === m.region_id)),
   ])
-  const materials = data.materials.filter(
+  const materials = scopedMaterials.filter(
     (m) =>
       [variant(m), m.ca].join(' ').toLowerCase().includes(search.toLowerCase()),
   )
-  const pages=usePages(materials,search)
+  const pages=usePages(materials,search+unit)
   return (
     <>
       <Panel
@@ -222,6 +225,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
                 ...(editing?.color && !materialColors.includes(editing.color) ? [editing.color] : []),
               ]}
             />
+            {profile.is_master && show==='new' && <Select label="Unidade do material" name="master_unit" defaultValue={unit} required options={units}/>}
             {needsTechnician && (directoryError?<p role="alert">{directoryError} <button type="button" className="secondary" onClick={()=>setRetryDirectory(n=>n+1)}>Tentar novamente</button></p>:
               technicians?.length===1?<><p>Estoque do técnico responsável · {technicians[0].name}</p>
                 <input type="hidden" name="technician_id" value={technicians[0].id}/></>:
@@ -238,6 +242,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
           </ActionForm>
         )}
         <div className="epi-filters">
+          {profile.is_master&&<Select label="Filtrar material por unidade" placeholder="Todas as unidades" value={unit} onChange={e=>setUnit(e.target.value)} options={units}/>}
           <Field
             label="Buscar material ou CA"
             type="search"

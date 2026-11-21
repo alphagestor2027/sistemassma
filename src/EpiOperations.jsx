@@ -16,7 +16,9 @@ const stages = [
 export function Requests({ data, profile, save, refresh, initialFocus }) {
   const [status, setStatus] = useState('')
   const [focused,setFocused]=useState(initialFocus)
-  const list = data.requests.filter(q => (!status || q.status === status)&&(!focused||q.id===focused))
+  const [action,setAction]=useState('')
+  const activeRequests=data.requests.filter(q=>!q.list_removed)
+  const list = activeRequests.filter(q => (!status || q.status === status)&&(!focused||q.id===focused))
   const pages=usePages(list.flatMap(q=>q.items.map(item=>({q,item}))),status)
   const visible=new Map()
   for(const {q,item} of pages.items){
@@ -32,6 +34,10 @@ export function Requests({ data, profile, save, refresh, initialFocus }) {
         </button>
       }
     >
+      {activeRequests.length>0&&<button className="secondary" onClick={()=>setAction(action==='clear'?'':'clear')}>Limpar solicitações</button>}
+      {action==='clear'&&<ActionForm submit="Confirmar limpeza" onSave={()=>save('clear_requests',{})} onDone={()=>setAction('')}>
+        <p>Remover todas as solicitações do seu acesso, em todos os períodos e situações? As reservas pendentes serão liberadas. As entregas continuarão no financeiro e nas fichas.</p>
+        <button type="button" className="secondary" onClick={()=>setAction('')}>Voltar</button></ActionForm>}
       <div className="epi-filters">
         {focused&&<button className="secondary" onClick={()=>setFocused(null)}>Ver todas as solicitações</button>}
         <Select
@@ -124,6 +130,18 @@ export function Requests({ data, profile, save, refresh, initialFocus }) {
                 {q.destination && ' · Custo do ' + q.destination}
               </small>
             )}
+            {q.management_note&&<p>{q.management_note}</p>}
+            <div className="button-group"><button className="secondary" onClick={()=>setAction('edit'+q.id)}>Editar</button>
+              <button className="secondary" onClick={()=>setAction('remove'+q.id)}>Remover</button></div>
+            {action==='edit'+q.id&&<ActionForm submit="Salvar edição" onDone={()=>setAction('')} onSave={p=>save('edit_request',{
+              request_id:q.id,status:q.status,previous_note:q.management_note||'',previous_postal:q.postal,note:p.note,postal:p.postal,
+              previous_qty:Object.fromEntries(q.complete.map(i=>[i.material_id,i.qty])),quantities:p})}>
+              <Field label="Observação da solicitação" name="note" defaultValue={q.management_note} maxLength={500}/>
+              <Field label="Rastreio dos Correios" name="postal" defaultValue={q.postal} maxLength={64}/>
+              {q.status==='Solicitado'&&q.complete.map(i=><Field key={i.material_id} label={'Quantidade · '+variant(i)} name={i.material_id} type="number" min={1} required defaultValue={i.qty}/>)}
+              <button type="button" className="secondary" onClick={()=>setAction('')}>Cancelar edição</button></ActionForm>}
+            {action==='remove'+q.id&&<ActionForm submit="Confirmar remoção" onDone={()=>setAction('')} onSave={()=>save('remove_request',{request_id:q.id})}>
+              <p>Remover esta solicitação da lista? Uma reserva pendente será liberada.</p><button type="button" className="secondary" onClick={()=>setAction('')}>Voltar</button></ActionForm>}
           </article>
         )
       })}
