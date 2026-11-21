@@ -63,13 +63,13 @@ export function Requests({ data, profile, save, refresh }) {
             </header>
             <p>{q.items.map((i) => i.qty + ' × ' + variant(i)).join(', ')}</p>
             <small>
-              Rastreio {q.tracking_code} · Técnico responsável: {reg?.technician || q.technician}
+              Rastreio {q.tracking_code} · Técnico responsável: {q.technician || reg?.technician}
             </small>
             <p>
               Andamento: <strong>{q.status === 'Solicitado' ? q.stage : q.status}</strong>
               {q.postal && ' · Correios: ' + q.postal}
             </p>
-            {q.status === 'Solicitado' && reg?.technician_id === profile.user_id && (
+            {q.status === 'Solicitado' && (profile.is_master || reg?.id === profile.stock_unit) && (
               <ActionForm
                 key={q.stage + '|' + q.postal}
                 submit="Salvar andamento"
@@ -99,7 +99,7 @@ export function Requests({ data, profile, save, refresh }) {
             )}
             {q.status === 'Solicitado' ? (
               <div className="epi-request-actions">
-                {reg?.technician_id === profile.user_id && (
+                {(profile.is_master || reg?.id === profile.stock_unit) && (
                   <ActionForm
                     submit="Confirmar entrega"
                     onSave={(p) => save('deliver', { ...p, request_id: q.id })}

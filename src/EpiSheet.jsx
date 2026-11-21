@@ -2,6 +2,7 @@ import React, { useEffect, useRef, useState } from 'react'
 import { Field, Panel, Select, rpc } from './EpiShared'
 import { ReplacementAlert } from './EpiIndicators'
 import { defaultSettings, identityFields, SheetDocument } from './EpiSheetDocument'
+import { SheetMaterials,deliveryReasons } from './SheetMaterials'
 import { stamp } from './epiData'
 
 async function squareLogo(file) {
@@ -21,10 +22,11 @@ async function squareLogo(file) {
   } finally { image.close() }
 }
 
-function EmployeeSheets({db,id,profile,delivered}) {
+function EmployeeSheets({db,id,profile,delivered,onIssued}) {
   const [context,setContext] = useState(null), [doc,setDoc] = useState(null), [settings,setSettings] = useState(null)
   const [mode,setMode] = useState('new'), [busy,setBusy] = useState(false), [error,setError] = useState('')
   const [confirm,setConfirm] = useState(false), [template,setTemplate] = useState(false), [reload,setReload] = useState(0)
+  const [items,setItems]=useState([])
   const newId = useRef(crypto.randomUUID())
   const lock = useRef(false)
   const api = (action,p={}) => rpc(db,'sheet',{action,p:{employee_id:id,...p}})
@@ -36,7 +38,7 @@ function EmployeeSheets({db,id,profile,delivered}) {
       if (!current) return
       setContext(value)
       setDoc(null)
-      setMode('new')
+      setMode('new');setItems([])
       setConfirm(false)
       setTemplate(false)
       newId.current = crypto.randomUUID()
@@ -57,10 +59,11 @@ function EmployeeSheets({db,id,profile,delivered}) {
   function save() {
     return run(async () => {
       const value = await api(mode==='new'?'issue':'edit',{
-        id:doc?.id || newId.current, revision:doc?.revision, version:context.version, settings, save_template:template,
+        id:doc?.id || newId.current, revision:doc?.revision, version:context.version, settings, save_template:template, ...(mode==='new'?{new_items:items}:{}),
       })
       setContext(previous => ({...previous,sheets:[value,...previous.sheets.filter(s=>s.id!==value.id)]}))
       view(value)
+      if(mode==='new') onIssued?.()
     })
   }
   const field = (key,value) => setSettings(current => ({...current,[key]:value}))
@@ -83,6 +86,7 @@ function EmployeeSheets({db,id,profile,delivered}) {
             <button className="primary" disabled={busy} onClick={()=>window.print()}>Imprimir ficha / salvar PDF</button>
           </>}
         </div>
+        {doc?.expires_at && <p>Exclusão programada para {stamp(doc.expires_at)}.</p>}
         {confirm && <div className="notice"><p>Excluir a ficha nº {doc.number}? As entregas continuarão no histórico do colaborador.</p>
           <button className="secondary" disabled={busy} onClick={()=>setConfirm(false)}>Cancelar</button>{' '}
           <button className="primary" disabled={busy} onClick={()=>run(async()=>{await api('delete',{id:doc.id,revision:doc.revision});setReload(n=>n+1)})}>Confirmar exclusão</button>
@@ -92,8 +96,10 @@ function EmployeeSheets({db,id,profile,delivered}) {
       {mode!=='view' && <Panel title={mode==='edit'?'Editar ficha nº '+doc.number:'Nova ficha de EPI'}>
         <form className="fepi-editor" onSubmit={e=>{e.preventDefault();save()}}>
           <fieldset disabled={busy}>
+            {mode==='new' && <SheetMaterials materials={context.materials || []} items={items} setItems={setItems} project={snapshot.unit}/>}
+
             <details><summary>Identificação da empresa e do colaborador</summary><div className="fepi-grid">
-              {identityFields.map(([key,label])=><Field key={key} label={label} maxLength={254} value={settings.identity[key]}
+              {identityFields.map(([key,label])=><Field key={key} label={label} readOnly={key==='unit' && (items.length>0 || doc?.snapshot.items.some(i=>i.reason))} maxLength={254} value={settings.identity[key]}
                 onChange={e=>field('identity',{...settings.identity,[key]:e.target.value})}/>)}
             </div></details>
             <details><summary>Logo e textos da ficha</summary>
@@ -106,7 +112,7 @@ function EmployeeSheets({db,id,profile,delivered}) {
               {profile.is_master && (snapshot.company||snapshot.cnpj) && <label className="epi-check"><input type="checkbox" checked={template} onChange={e=>setTemplate(e.target.checked)}/> Usar esta logo e estes textos nas próximas fichas desta empresa</label>}
             </details>
             {snapshot.items.length>0 && <details><summary>Motivo de cada entrega</summary><div className="fepi-grid">
-              {snapshot.items.map(i=><Field key={i.key} label={i.date.split('-').reverse().join('/')+' · '+i.equipment} placeholder="Motivo da entrega" value={settings.reasons[i.key] || ''} maxLength={300}
+              {snapshot.items.map(i=><Select options={[...new Set([...deliveryReasons,...(settings.reasons[i.key]?[settings.reasons[i.key]]:[])])]} key={i.key} label={i.date.split('-').reverse().join('/')+' · '+i.equipment} placeholder="Motivo da entrega" value={settings.reasons[i.key] || ''} maxLength={300}
                 onChange={e=>field('reasons',{...settings.reasons,[i.key]:e.target.value})}/>)}
             </div></details>}
             <Field label="Local de assinatura" value={settings.place} maxLength={200} onChange={e=>field('place',e.target.value)}/>
@@ -122,7 +128,7 @@ function EmployeeSheets({db,id,profile,delivered}) {
   </>
 }
 
-export function Sheet({ db, data, profile }) {
+export function Sheet({ db, data, profile,onIssued }) {
   const [id,setId]=useState('')
   const [people,setPeople]=useState([]), [error,setError]=useState(''), [attempt,retry]=useState(0)
   useEffect(()=>{
@@ -133,10 +139,10 @@ export function Sheet({ db, data, profile }) {
     return ()=>{current=false}
   },[db,attempt])
   return <>
-    <Panel title="Ficha de EPI digital"><Select label="Consultar colaborador" value={id}
+    <Panel title="Ficha de EPI digital"><p>As fichas são excluídas permanentemente dois anos após a emissão. Salve o PDF em um local seguro. O painel avisa nas últimas 72 horas.</p><Select label="Consultar colaborador" value={id}
       options={people.map(e=>[e.id,e.name])} onChange={e=>setId(e.target.value)}/></Panel>
     {error && <p className="notice error" role="alert">{error} <button onClick={()=>retry(attempt+1)}>Tentar novamente</button></p>}
-    {id && <EmployeeSheets key={id} db={db} id={id} profile={profile}
+    {id && <EmployeeSheets key={id} db={db} id={id} profile={profile} onIssued={onIssued}
       delivered={data.requests.filter(q=>q.employee_id===id && q.status==='Entregue')}/>}
   </>
 }

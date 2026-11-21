@@ -1,0 +1,22 @@
+.theme-toggle{display:inline-grid;place-items:center;flex:0 0 auto;width:36px;height:36px;border:1px solid currentColor;border-radius:8px;color:inherit;background:transparent}
+.login-form-side>.theme-toggle{position:absolute;right:22px;top:20px}
+@media screen{
+:root[data-theme="dark"]{color-scheme:dark;background:#11141a;color:#f0f2f6;--line:#353e4a;--muted:#b1bac7;--red:#bf263c}
+[data-theme="dark"] :is(.epi-portal,.workspace,.login-page){background:#11141a;color:#f0f2f6}
+[data-theme="dark"] :is(.card,.topbar,.login-form-side,dialog,.epi-context>div,.epi-metrics>div,.donut>div,.epi-context,.secondary,.select-wrap,.epi-bar a,.sheet-preview){background:#1c222b;color:#edf0f6;border-color:#3b4452}
+[data-theme="dark"] :is(.global-search,.period,th,.ca-result,.input-icon,.tile.neutral,.progress-track,.alert-row:hover,.area-row:hover,.epi-bar nav button:hover,.secondary:hover){background:#28313d;color:#e5e9f1}
+[data-theme="dark"] :is(input:not([type=checkbox]):not([type=radio]),select,option,textarea){background-color:#191f28;color:#eff2f6;border-color:#4c5869}
+[data-theme="dark"] :is(td,.epi-field,.epi-bar nav button,.login-form-box label,.epi-empty,.epi-help,.epi-request small,.epi-pick small,.epi-context small,.epi-metrics small,.ca-result dt,.page-heading p,.row-text small,.progress-item>div:first-child){color:#c6cfdd}
+[data-theme="dark"] :is(td strong,.row-text>b,.progress-item b,.donut-legend b,.empty h3,.login-form-box h2){color:#f1f3f8}
+[data-theme="dark"] :is(.notice,.demo-notice){background:#202c39;color:#d5e6fb;border-color:#4a5869}
+[data-theme="dark"] :is(.epi-success,.badge.green){background:#15372f;color:#a7ebce;border-color:#36765c}
+[data-theme="dark"] :is(.notice.error,.form-error,.badge.red,.tile,.alert-symbol,.login-lock,.epi-bar nav button.selected){background:#45242d;color:#ffbbc5;border-color:#793844}
+[data-theme="dark"] :is(.text-button,.epi-request details summary){color:#ff9bab}
+[data-theme="dark"] .badge.gray{background:#303744;color:#dbe1e9}
+[data-theme="dark"] :is(.fepi-document,.fepi-page){color-scheme:light;color:#18191c}
+[data-theme="dark"] :is(.fepi-document,.fepi-page) :is(td,th,strong){color:inherit}
+}
+@media print{.theme-toggle{display:none!important}}
+.login-form-side{position:relative}
+.epi-mast .theme-toggle{margin-left:8px}
+@media(max-width:420px){.epi-mast>div{gap:5px}.epi-mast .theme-toggle{margin-left:2px}.topbar-actions{gap:5px}.global-search{min-width:0}}

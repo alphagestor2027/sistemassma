@@ -38,63 +38,6 @@ function PriceField({ label, placeholder, initialValue }) {
 }
 const materialColors = ['Amarelo', 'Azul', 'Azul-marinho', 'Bege', 'Branco', 'Cinza', 'Incolor', 'Laranja', 'Marrom', 'Multicolorido', 'Preto', 'Rosa', 'Roxo', 'Verde', 'Vermelho', 'Vinho', 'Outra',]
 const numberProps = { type: 'number', min: 0, step: 1 }
-export function Regions({ data, employees, profile, save }) {
-  const [emp, setEmp] = useState('')
-  const units = data.regions.filter(r => r.distribution_unit)
-  const options = units.map(r => [r.id, r.distribution_unit])
-  const projects = data.projects || []
-  const active = employees.filter(e => e.status === 'Ativo' && data.assignments.some(a => a.employee_id === e.id))
-  const assignment = data.assignments.find(a => a.employee_id === emp)
-  return (
-    <>
-      <Panel title="Unidades de distribuição">
-        <Table headers={['Unidade', 'Responsável']} rows={units.map(r => [r.distribution_unit, r.technician])} />
-        {profile.is_master && <ActionForm submit="Salvar responsável" onSave={p => save('region', p)}>
-          <Select label="Unidade de distribuição" name="region_id" options={options} required />
-          <Field label="Login do responsável no SSMA" name="login" required />
-        </ActionForm>}
-      </Panel>
-      {profile.is_master && <Panel title="Unidade de distribuição por projeto">
-        <ActionForm submit="Salvar unidade do projeto" onSave={p => save('project_unit', p)}>
-          <Select label="Projeto" name="project" options={projects.map(p => p.project)} required />
-          <Select label="Unidade que atende o projeto" name="region_id" options={options} required />
-        </ActionForm>
-        <Table headers={['Projeto', 'Unidade de distribuição']} rows={projects.map(p =>
-          [p.project, units.find(r => r.id === p.region_id)?.distribution_unit || 'A definir'])}
-          empty="Cadastre um colaborador com projeto para definir a unidade de distribuição." />
-      </Panel>}
-      <Panel title="Vínculos dos colaboradores">
-        <ActionForm submit="Salvar vínculo" onSave={(p) => save('assignment', p)} onDone={() => setEmp('')}>
-          <Select
-            label="Colaborador"
-            name="employee_id"
-            options={active.map((e) => [e.id, e.title])}
-            value={emp}
-            onChange={(e) => setEmp(e.target.value)}
-            required
-          />
-          <input type="hidden" name="region_id" value={assignment?.region_id || ''} />
-          <Field label="Projeto" value={assignment?.project || ''} readOnly />
-          <Field label="Unidade de distribuição" value={regionLabel(data.regions.find(r => r.id === assignment?.region_id))} readOnly />
-          <Field key={'center'+emp} label="Centro de custo" name="center" defaultValue={assignment?.center || ''} />
-          <Field key={'contract'+emp} label="Contrato" name="contract" defaultValue={assignment?.contract || ''} />
-        </ActionForm>
-        <Table
-          headers={['Colaborador', 'Unidade', 'Projeto', 'Cargo', 'Centro de custo', 'Contrato']}
-          rows={data.assignments.map((a) => [
-            a.employee || employees.find((e) => e.id === a.employee_id)?.title,
-            regionLabel(data.regions.find((r) => r.id === a.region_id)),
-            a.project,
-            a.job,
-            a.center || '—',
-            a.contract || '—',
-          ])}
-        />
-      </Panel>
-    </>
-  )
-}
-
 export function Stock({ db, data, profile, save }) {
   const [noCA, setNoCA] = useState(false),
     [region, setRegion] = useState(''),

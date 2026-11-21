@@ -29,7 +29,7 @@ export const identityFields = [
 
 export function defaultSettings(snapshot, template) {
   const identity = Object.fromEntries(identityFields.map(([key]) => [key,snapshot[key] || '']))
-  return { legal:defaultLegal, term:defaultTerm, logo:'', ...template, identity, place:'', reasons:{} }
+  return { legal:defaultLegal, term:defaultTerm, logo:'', ...template, identity, place:'', reasons:Object.fromEntries(snapshot.items.filter(i=>i.reason).map(i=>[i.key,i.reason])) }
 }
 
 function Masthead({logo,number}) {

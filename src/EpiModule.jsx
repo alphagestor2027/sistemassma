@@ -5,12 +5,12 @@ import {
   Wallet,
   FileText,
   FlaskConical,
-  MapPin,
   CalendarDays,
   Archive,
   ExternalLink,
 } from 'lucide-react'
-import { Stock, Regions, Planning } from './EpiStock'
+import { Stock, Planning } from './EpiStock'
+import { StockHistory } from './StockHistory'
 import { Sheet } from './EpiSheet'
 import { Requests, Finance, Tests } from './EpiOperations'
 import { rpc } from './EpiShared'
@@ -24,10 +24,9 @@ const tabs = [
   ['Ficha digital', FileText],
   ['Ensaios e retornos', FlaskConical],
   ['Previsão de compras', CalendarDays],
-  ['Regionais e vínculos', MapPin],
-  ['Registros anteriores', Archive],
+  ['Histórico de movimentações', Archive],
 ]
-export default function EpiModule({ db, profile, employees, children, initialTab = 'Estoque', onChange }) {
+export default function EpiModule({ db, profile, employees, initialTab = 'Estoque', onChange }) {
   const [selected, setTab] = useState(initialTab),
     [data, setData] = useState(null),
     [error, setError] = useState(''),
@@ -40,7 +39,7 @@ export default function EpiModule({ db, profile, employees, children, initialTab
     try {
       const next = await rpc(db, 'workspace', {})
       if (version !== revision.current) return
-      if (!next && tab !== 'Registros anteriores') throw new Error('Perfil sem acesso ao módulo de EPI.')
+      if (!next && tab !== 'Histórico de movimentações') throw new Error('Perfil sem acesso ao módulo de EPI.')
       setData(next)
       setError('')
     } catch (e) {
@@ -105,8 +104,8 @@ export default function EpiModule({ db, profile, employees, children, initialTab
         </div>
       )}
       <div className="epi-tab-content" key={tab}>
-        {tab === 'Registros anteriores' ? (
-          children
+        {tab === 'Histórico de movimentações' ? (
+          <StockHistory db={db} profile={profile}/>
         ) : !data || !profile ? (
           !error && <p className="notice">Carregando o módulo de EPI…</p>
         ) : (
@@ -114,10 +113,9 @@ export default function EpiModule({ db, profile, employees, children, initialTab
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
             {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
             {tab === 'Financeiro' && <Finance {...props} />}
-            {tab === 'Ficha digital' && <Sheet {...props} db={db} />}{' '}
+            {tab === 'Ficha digital' && <Sheet {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
             {tab === 'Ensaios e retornos' && <Tests {...props} />}{' '}
             {tab === 'Previsão de compras' && <Planning {...props} />}
-            {tab === 'Regionais e vínculos' && <Regions {...props} />}
           </>
         )}
       </div>

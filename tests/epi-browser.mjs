@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { epiFixture, applyDistributionUnits } from './epi-db.mjs'
+import { epiFixture, applyDistributionUnits, applySheetDistribution } from './epi-db.mjs'
 
 const { pg, owner, tech, employee, call } = await epiFixture()
 const installed = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
@@ -82,6 +82,7 @@ async function client(actor) {
 try {
   await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
   await applyDistributionUnits(pg)
+  await applySheetDistribution(pg)
   const admin = await client(owner)
   admin.on('pageerror', (e) => console.error(e.message))
   await admin.goto(base)
@@ -89,12 +90,12 @@ try {
   await admin.locator('[name=password]').fill('local-test')
   await admin.getByRole('button', { name: 'Entrar no sistema' }).click()
   const button = (p, name) => p.getByRole('button', { name, exact: true })
-  await button(admin, 'Gestão de EPIs').click()
-  await button(admin, 'Regionais e vínculos').click()
+  await admin.getByRole('navigation',{name:'Administração Master'}).getByRole('button',{name:'Gestão de técnicos'}).click()
   await admin.getByLabel('Projeto',{exact:true}).filter({visible:true}).first().selectOption('Projeto Norte')
   await admin.getByLabel('Unidade que atende o projeto').selectOption({label:'MATRIZ'})
   await button(admin,'Salvar unidade do projeto').click()
-  await admin.getByRole('cell',{name:'Ana Silva',exact:true}).waitFor()
+  await admin.getByText('Unidade do projeto atualizada.').waitFor()
+  await button(admin, 'Gestão de EPIs').click()
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()
   await pg.query("insert into ssma_epi.ca_catalog(ca,fichas) values ('111',$1)", [
@@ -129,7 +130,7 @@ try {
   await admin.getByLabel('Nova validade do CA').fill('2029-03-15')
   await admin.getByLabel('Valor unitário (R$)', { exact: true }).fill('30')
   await admin.getByLabel('Quantidade', { exact: true }).fill('3')
-  const startDay = new Date().toISOString().slice(0, 10)
+  const startDay = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date())
   const leftGlove = admin.getByLabel('Número da luva esquerda')
   const rightGlove = admin.getByLabel('Número da luva direita')
   await leftGlove.fill('0001-E')
@@ -185,14 +186,14 @@ try {
   await portal.setViewportSize({ width: 390, height: 844 })
   await portal.goto(link)
   await portal.getByLabel('Nome do colaborador').selectOption(employee)
-  await portal.getByLabel('Estado', { exact: true }).selectOption('DF')
+  assert.equal(await portal.getByLabel('Estado', { exact: true }).count(),0)
   await portal.getByLabel('Quantidade de Luva isolante · Tam. M').fill('2')
   await button(portal, 'Enviar solicitação').click()
   await portal.getByRole('cell', { name: 'Pedido recebido', exact: true }).waitFor()
   assert.ok(await portal.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
 
   await button(admin, 'Solicitações').click()
-  const code = await portal.getByLabel('Código de rastreio do pedido').inputValue()
+  const code = await portal.getByTestId('receipt-code').innerText()
   await admin.getByLabel('Etapa do pedido').selectOption('Enviado pelos Correios')
   await admin.getByLabel('Número de rastreamento dos Correios').fill('AA123456789BR')
   await button(admin, 'Salvar andamento').click()
@@ -201,6 +202,13 @@ try {
   await portal.getByLabel('Código de rastreio do pedido').fill(code)
   await button(portal, 'Consultar andamento').click()
   await portal.getByText('AA123456789BR', { exact: true }).waitFor()
+  await portal.getByLabel('Nome completo para rastreamento').fill('Ana Silva')
+  await button(portal,'Consultar pelo nome').click()
+  await portal.getByRole('cell',{name:'AA123456789BR',exact:true}).waitFor()
+  assert.equal(await portal.getByTestId('receipt-code').count(),0)
+  await button(portal,'Ativar modo escuro').click()
+  await portal.reload()
+  await button(portal,'Ativar modo claro').click()
   await admin.getByText(/Despesa da entrega:/).waitFor()
   await button(admin, 'Confirmar entrega').click()
   await admin.locator('article .badge').filter({ hasText: 'Entregue' }).waitFor()
@@ -234,9 +242,9 @@ try {
   const term = admin.getByLabel('Termo de responsabilidade',{exact:true})
   await term.fill((await term.inputValue())+' Confirmo o recebimento dos itens relacionados.')
   await admin.getByText('Motivo de cada entrega',{exact:true}).click()
-  await admin.getByPlaceholder('Motivo da entrega').fill('Substituição por desgaste')
+  await admin.locator('.fepi-grid select').selectOption('Substituição por período de troca/desgaste')
   await button(admin,'Salvar alterações da ficha').click()
-  await sheet.getByRole('cell',{name:'Substituição por desgaste'}).waitFor()
+  await sheet.getByRole('cell',{name:'Substituição por período de troca/desgaste'}).waitFor()
   assert.equal(await sheet.locator('img').first().evaluate(el=>el.naturalWidth===el.naturalHeight),true)
   const docId = await admin.getByLabel('Abrir ficha').inputValue()
   await admin.getByLabel('Abrir ficha').selectOption('')
@@ -254,6 +262,8 @@ try {
   await button(admin,'Emitir ficha').waitFor()
   assert.equal(await admin.getByLabel('Abrir ficha').locator('option').count(),1)
   await sheet.getByRole('cell',{name:'111',exact:true}).waitFor()
+  await button(admin,'Histórico de movimentações').click()
+  await admin.getByRole('cell',{name:'Saída',exact:true}).waitFor()
   await button(admin, 'Ensaios e retornos').click()
   await admin.getByLabel('Entrega confirmada').selectOption({ index: 1 })
   await admin.getByLabel('Equipamento entregue').selectOption({ index: 1 })
@@ -266,9 +276,20 @@ try {
   await admin.locator('article .badge').filter({ hasText: 'Em trânsito' }).waitFor()
   await portal.reload()
   await portal.getByLabel('Nome do colaborador').selectOption(employee)
-  await portal.getByLabel('Estado', { exact: true }).selectOption('DF')
+  assert.equal(await portal.getByLabel('Estado', { exact: true }).count(),0)
   await portal.getByRole('cell', { name: 'Entregue', exact: true }).waitFor()
   await portal.getByText('Está na hora de realizar a substituição do material.').waitFor()
+  await button(admin,'Ficha digital').click()
+  await admin.getByLabel('Consultar colaborador').selectOption(employee)
+  await admin.getByLabel('Material de EPI',{exact:true}).selectOption({index:1})
+  await admin.getByLabel('Motivo da entrega',{exact:true}).selectOption('Inicial')
+  await button(admin,'Incluir material na ficha').click()
+  await button(admin,'Emitir ficha').click()
+  await button(admin,'Editar ficha').waitFor()
+  await admin.getByRole('article',{name:'Ficha de EPI para impressão'}).getByRole('cell',{name:'Inicial',exact:true}).waitFor()
+  assert.equal((await pg.query("select qty from ssma_epi.materials where ca='111'")).rows[0].qty,0)
+  await button(admin,'Financeiro').click()
+  await admin.getByRole('cell',{name:'R$ 90,00',exact:true}).first().waitFor()
   await pg.query(
     "insert into public.ssma_records(owner_id,module,title,unit,event_date) values ($1,'acidentes','Acidente DF','Obra / DF','2020-01-02'),($1,'acidentes','Acidente SP','Base / SP','2020-01-02'),($1,'acidentes','Acidente anterior','Obra / DF','2020-01-01')",
     [owner],
@@ -321,6 +342,7 @@ try {
   await admin.getByRole('checkbox', { name: 'Centro-Oeste', exact: true }).uncheck()
   await admin.getByRole('checkbox', { name: 'MG', exact: true }).check()
   await admin.getByLabel('Nome do técnico').fill('Maria Silva')
+  await admin.getByLabel('Unidade de distribuição do técnico').selectOption({label:'DF'})
   await admin.getByLabel('Acesso ao sistema').selectOption('Inativo')
   await button(admin, 'Salvar cadastro').click()
   await admin.getByRole('heading', { name: 'Cadastro de Maria Silva' }).waitFor()

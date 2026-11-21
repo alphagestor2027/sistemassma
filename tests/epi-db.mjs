@@ -105,3 +105,8 @@ export async function applyDistributionUnits(pg) {
     await pg.exec(await readFile(new URL(name, dir), 'utf8'))
   }
 }
+export async function applySheetDistribution(pg) {
+  const dir=new URL('../supabase/migrations/',import.meta.url)
+  const file=(await readdir(dir)).find(f=>f.endsWith('_emissoes_estoque_unidades.sql'))
+  await pg.exec(await readFile(new URL(file,dir),'utf8'))
+}

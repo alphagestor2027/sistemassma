@@ -5,8 +5,7 @@ export const epiSections = {
   'Ficha digital': 'ficha',
   'Ensaios e retornos': 'ensaios',
   'Previsão de compras': 'compras',
-  'Regionais e vínculos': 'regionais',
-  'Registros anteriores': 'anteriores',
+  'Histórico de movimentações': 'historico',
 }
 export function permitted(profile, key) {
   if (!profile || profile.active === false) return false

@@ -1,3 +1,5 @@
+import {ThemeToggle} from './ThemeToggle'
+import {NameTracking} from './NameTracking'
 import { ReplacementAlert } from './EpiIndicators'
 import React, { useEffect, useRef, useState } from 'react'
 import { HardHat, ClipboardList } from 'lucide-react'
@@ -24,9 +26,12 @@ export default function EpiPortal({ db }) {
     }
   }
   const [employee, setEmployee] = useState(''),
-    [state, setState] = useState(''),
-    [names, setNames] = useState([]),
-    [states, setStates] = useState([])
+    [names, setNames] = useState([])
+  const nameOptions=React.useMemo(()=>{
+    const seen=new Set(),duplicates=new Set()
+    for(const n of names){if(seen.has(n.name))duplicates.add(n.name);seen.add(n.name)}
+    return names.map(n=>[n.id,duplicates.has(n.name)?n.name+' · '+n.project:n.name])
+  },[names])
   const [context, setContext] = useState(null),
     [counts, setCounts] = useState({}),
     [error, setError] = useState(''),
@@ -41,12 +46,11 @@ export default function EpiPortal({ db }) {
     setError('')
     setLoading(true)
     setContext(null)
-    const action = state ? 'context' : employee ? 'states' : 'names'
-    rpc(db, 'portal', { action, p: { employee_id: employee, state } })
+    const action = employee ? 'context' : 'names'
+    rpc(db, 'portal', { action, p: { employee_id: employee } })
       .then((result) => {
         if (!active) return
         if (action === 'names') setNames(result)
-        else if (action === 'states') setStates(result)
         else setContext(result)
       })
       .catch((e) => {
@@ -58,7 +62,7 @@ export default function EpiPortal({ db }) {
     return () => {
       active = false
     }
-  }, [db, employee, state, refresh])
+  }, [db, employee, refresh])
   async function send(e) {
     e.preventDefault()
     if (lock.current) return
@@ -74,10 +78,10 @@ export default function EpiPortal({ db }) {
     try {
       const id = await rpc(db, 'portal', {
         action: 'submit',
-        p: { id: formKey.current, employee_id: employee, state, items },
+        p: { id: formKey.current, employee_id: employee, items },
       })
-      setMessage('Pedido recebido. Guarde seu código de rastreio: ' + id)
-      setCode(id)
+      setMessage(id)
+      setCode('')
       setTracking(null)
       setTrackingError('')
       formKey.current = null
@@ -101,7 +105,7 @@ export default function EpiPortal({ db }) {
             Sistema SSMA <b>2.0</b>
           </strong>
         </div>
-        <span>Portal do colaborador</span>
+        <div><span>Portal do colaborador</span><ThemeToggle/></div>
       </header>
       <main>
         <div className="page-heading">
@@ -117,24 +121,9 @@ export default function EpiPortal({ db }) {
               label="Nome do colaborador"
               value={employee}
               disabled={busy || !names.length}
-              options={names.map((n) => [n.id, n.name])}
+              options={nameOptions}
               onChange={(e) => {
                 setEmployee(e.target.value)
-                setStates([])
-                setState('')
-                setContext(null)
-                setCounts({})
-                setMessage('')
-                formKey.current = null
-              }}
-            />
-            <Select
-              label="Estado"
-              value={state}
-              options={states}
-              disabled={busy || !employee || !states.length}
-              onChange={(e) => {
-                setState(e.target.value)
                 setContext(null)
                 setCounts({})
                 setMessage('')
@@ -151,7 +140,7 @@ export default function EpiPortal({ db }) {
         )}
         {message && (
           <p role="status" className="epi-success">
-            {message}
+            Pedido recebido. Guarde este código para acompanhar a solicitação. Ele é exibido apenas nesta confirmação. <strong data-testid="receipt-code">{message}</strong>
           </p>
         )}
         {error && (
@@ -167,12 +156,15 @@ export default function EpiPortal({ db }) {
               {[
                 ['Projeto', context.project],
                 ['Cargo', context.job],
+                ['Gerência',context.management],['Coordenador',context.coordinator],
+                ...(context.registration?[['Matrícula',context.registration]]:context.cpf_masked?[['CPF',context.cpf_masked]]:[]),
+                ['Região',context.area],
                 ['Técnico de segurança', context.technician],
                 ['Unidade de distribuição', context.region],
               ].map(([label, v]) => (
                 <div key={label}>
                   <small>{label}</small>
-                  <strong>{v}</strong>
+                  <strong>{v || 'A definir'}</strong>
                 </div>
               ))}
             </section>
@@ -224,6 +216,7 @@ export default function EpiPortal({ db }) {
                       </label>
                     ))}
                   </div>
+                  <p className="epi-help">Ao enviar, guarde o código de rastreio. Ele aparece uma única vez na confirmação.</p>
                   <div className="epi-submit">
                     <button className="primary" disabled={busy || !Object.values(counts).some((n) => n > 0)}>
                       {busy ? 'Enviando…' : 'Enviar solicitação'}
@@ -267,6 +260,7 @@ export default function EpiPortal({ db }) {
               {checking ? 'Consultando…' : 'Consultar andamento'}
             </button>
           </form>
+          <NameTracking db={db}/>
           {trackingError && (
             <p role="alert" className="form-error">
               {trackingError}
