@@ -4,7 +4,7 @@ import {
   ClipboardList,
   Wallet,
   FileText,
-  FlaskConical,
+  Truck,
   Archive,
   ExternalLink,
 } from 'lucide-react'
@@ -12,25 +12,28 @@ import { Skeleton } from './Skeleton'
 import { Stock } from './EpiStock'
 import { StockHistory } from './StockHistory'
 import { Sheet } from './EpiSheet'
-import { Requests, Finance, Tests } from './EpiOperations'
+import {Logistics} from './EpiLogistics'
+import {Consolidated} from './EpiReports'
+import { Requests, Finance } from './EpiOperations'
 import { rpc } from './EpiShared'
 import './epi.css'
 import { epiSections, permitted } from './access'
 
 const tabs = [
   ['Estoque', Boxes],
+  ['Estoque Consolidado', Boxes],
   ['Solicitações', ClipboardList],
   ['Financeiro', Wallet],
   ['Ficha digital', FileText],
-  ['Ensaios e retornos', FlaskConical],
+  ['Correios', Truck],
   ['Histórico de movimentações', Archive],
 ]
-export default function EpiModule({ db, profile, employees, initialTab = 'Estoque', onChange }) {
+export default function EpiModule({ db, profile, employees, initialTab = 'Estoque', initialFocus, onTab, onChange }) {
   const [selected, setTab] = useState(initialTab),
     [data, setData] = useState(null),
     [error, setError] = useState(''),
     [message, setMessage] = useState('')
-  const visible = tabs.filter(([label]) => permitted(profile, 'epi.' + epiSections[label]))
+  const visible = tabs.filter(([label]) => permitted(profile, 'epi.' + (label==='Estoque Consolidado'?'estoque':epiSections[label])))
   const tab = visible.some(([label]) => label === selected) ? selected : visible[0]?.[0]
   const revision = useRef(0)
   const refresh = useCallback(async () => {
@@ -38,7 +41,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     try {
       const next = await rpc(db, 'workspace', {})
       if (version !== revision.current) return
-      if (!next && tab !== 'Histórico de movimentações') throw new Error('Perfil sem acesso ao módulo de EPI.')
+      if (!next && !['Correios','Histórico de movimentações'].includes(tab)) throw new Error('Perfil sem acesso ao módulo de EPI.')
       setData(next)
       setError('')
     } catch (e) {
@@ -67,7 +70,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     )
     return result
   }
-  const props = { data, profile, employees, save }
+  const props = { data, profile, employees, save, initialFocus:tab===initialTab?initialFocus:null }
   return (
     <div className="epi">
       <div className="epi-bar">
@@ -79,6 +82,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
               aria-current={tab === name ? 'page' : undefined}
               onClick={() => {
                 setTab(name)
+                onTab?.(name)
                 setMessage('')
               }}
             >
@@ -105,15 +109,15 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
       <div className="epi-tab-content" key={tab}>
         {tab === 'Histórico de movimentações' ? (
           <StockHistory db={db} profile={profile}/>
-        ) : !data || !profile ? (
+        ) : tab==='Correios' ? <Logistics db={db} profile={profile} shipping/> : !data || !profile ? (
           !error && <Skeleton label="Carregando o módulo de EPI…"/>
         ) : (
           <>
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
             {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
-            {tab === 'Financeiro' && <Finance {...props} />}
+            {tab === 'Financeiro' && <><Finance {...props} /><Logistics db={db} profile={profile} onSaved={refresh}/></>}
             {tab === 'Ficha digital' && <Sheet {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
-            {tab === 'Ensaios e retornos' && <Tests {...props} />}{' '}
+            {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}{' '}
           </>
         )}
       </div>

@@ -22,11 +22,21 @@ await page.route('https://gotofoqjtjaeuicfqluo.supabase.co/**',async route=>{con
  await route.fulfill({status,contentType:'application/json',body:JSON.stringify(data)});
 });
 try{
+await page.route('**/api/assistant',async route=>{
+  assert.match(route.request().headers().authorization,/^Bearer /)
+  const body=route.request().postDataJSON()
+  assert.equal(body.action,'ask')
+  return route.fulfill({json:{answer:'Conferir o estoque do item indicado.',provider:'Teste',count:1,facts:[{label:'Item de teste',values:{disponível:2},source:'epis',tab:'Estoque'}]}})
+})
 await page.goto(process.env.APP_URL || 'http://127.0.0.1:5173');await page.getByRole('heading',{name:'Acesse sua conta'}).waitFor();assert.equal(await page.getByText('Criar conta',{exact:true}).count(),0);
 await page.screenshot({path:'test-results/login-desktop.png',fullPage:true});
 await page.locator('[name=username]').fill('cesar');await page.locator('[name=password]').fill('wrong');await page.getByRole('button',{name:'Entrar no sistema',exact:true}).click();await page.getByRole('alert').waitFor();
 await page.locator('[name=password]').fill('ui-test-password');await page.getByRole('button',{name:'Entrar no sistema',exact:true}).click();await page.getByRole('heading',{name:'Dashboard Geral',exact:true}).waitFor();
 assert.equal(await page.getByRole('button',{name:'Visualizar demonstração'}).count(),0);assert.equal(await page.getByLabel('Filtrar por unidade').count(),0);await page.getByRole('cell',{name:'Vencida · substituir'}).waitFor();await page.getByRole('cell',{name:'Centro-Oeste · DF'}).waitFor();await page.screenshot({path:'test-results/dashboard-desktop.png',fullPage:true});
+await page.getByRole('button',{name:'Abrir assistente de IA'}).click()
+await page.getByRole('button',{name:'Consultar assistente'}).click()
+await page.getByText('Conferir o estoque do item indicado.').waitFor()
+await page.getByRole('button',{name:'Fechar assistente'}).click()
 await page.getByRole('button',{name:'Gestão de Resíduos',exact:true}).click();await page.getByRole('button',{name:'Novo registro',exact:true}).first().click();await page.locator('[name=title]').fill('Destinação de resíduos - teste');await page.locator('[name=person]').fill('Colaborador teste');await page.locator('[name=extra]').fill('CA 00000');await page.getByRole('button',{name:'Salvar registro'}).click();await page.getByRole('cell',{name:'Destinação de resíduos - teste'}).first().waitFor();
 await page.getByRole('button',{name:'Editar Destinação de resíduos - teste'}).click();await page.locator('[name=status]').selectOption('Concluído');await page.getByRole('button',{name:'Salvar registro'}).click();await page.getByRole('cell',{name:'Concluído',exact:true}).waitFor();assert.equal(records[0].status,'Concluído');
 await page.getByRole('button',{name:'Excluir Destinação de resíduos - teste'}).click();await page.getByRole('button',{name:'Excluir registro',exact:true}).click();await page.getByRole('heading',{name:'Comece por um novo registro'}).waitFor();assert.equal(records.length,0);

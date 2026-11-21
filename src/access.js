@@ -3,7 +3,7 @@ export const epiSections = {
   Solicitações: 'solicitacoes',
   Financeiro: 'financeiro',
   'Ficha digital': 'ficha',
-  'Ensaios e retornos': 'ensaios',
+  'Correios': 'correios',
   'Histórico de movimentações': 'historico',
 }
 export function permitted(profile, key) {

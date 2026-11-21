@@ -1,3 +1,5 @@
+import {usePages} from './Pagination'
+import {CostBreakdown, DateRange, within} from './EpiReports'
 import React, { useState } from 'react'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { money, variant, expenseGroups, stamp, nextStatus } from './epiData'
@@ -11,9 +13,16 @@ const stages = [
   'Enviado pelos Correios',
 ]
 
-export function Requests({ data, profile, save, refresh }) {
+export function Requests({ data, profile, save, refresh, initialFocus }) {
   const [status, setStatus] = useState('')
-  const list = data.requests.filter(q => !status || q.status === status)
+  const [focused,setFocused]=useState(initialFocus)
+  const list = data.requests.filter(q => (!status || q.status === status)&&(!focused||q.id===focused))
+  const pages=usePages(list.flatMap(q=>q.items.map(item=>({q,item}))),status)
+  const visible=new Map()
+  for(const {q,item} of pages.items){
+    if(!visible.has(q.id)) visible.set(q.id,{...q,items:[],complete:q.items})
+    visible.get(q.id).items.push(item)
+  }
   return (
     <Panel
       title="Solicitações dos colaboradores"
@@ -24,6 +33,7 @@ export function Requests({ data, profile, save, refresh }) {
       }
     >
       <div className="epi-filters">
+        {focused&&<button className="secondary" onClick={()=>setFocused(null)}>Ver todas as solicitações</button>}
         <Select
           label="Situação"
           placeholder="Todas"
@@ -32,7 +42,7 @@ export function Requests({ data, profile, save, refresh }) {
           options={['Solicitado', 'Entregue', 'Cancelado']}
         />
       </div>
-      {list.map((q) => {
+      {[...visible.values()].map((q) => {
         const reg = data.regions.find((r) => r.id === q.region_id)
         return (
           <article className="epi-request" key={q.id}>
@@ -52,6 +62,8 @@ export function Requests({ data, profile, save, refresh }) {
               </span>
             </header>
             <p>{q.items.map((i) => i.qty + ' × ' + variant(i)).join(', ')}</p>
+            {q.complete.length>q.items.length&&<details><summary>Ver solicitação completa ({q.complete.length} itens)</summary>
+              <p>{q.complete.map(i=>i.qty+' × '+variant(i)).join(', ')}</p></details>}
             <small>
               Rastreio {q.tracking_code} · Técnico responsável: {q.technician || reg?.technician}
             </small>
@@ -115,6 +127,7 @@ export function Requests({ data, profile, save, refresh }) {
           </article>
         )
       })}
+      {pages.controls}
       {!list.length && <p className="epi-empty">Nenhuma solicitação para os filtros selecionados.</p>}
     </Panel>
   )
@@ -124,8 +137,9 @@ export function Finance({ data }) {
   const [project, setProject] = useState(''),
     [center, setCenter] = useState(''),
     [contract, setContract] = useState('')
-  const {movements} = data
-  const groups = expenseGroups(data.requests.filter(request => !request.finance_cleared))
+  const [range,setRange]=useState({start:'',end:''})
+  const movements=data.movements.filter(m=>within(m.created_at,range))
+  const groups = expenseGroups(data.requests.filter(request => !request.finance_cleared && within(request.closed_at,range)))
   const sum = (list, fn) => list.reduce((s, x) => s + fn(x), 0)
   const movementValue = (kind) =>
     sum(
@@ -146,6 +160,7 @@ export function Finance({ data }) {
   return (
     <>
       <Panel title="Movimentação financeira">
+        <DateRange value={range} onChange={setRange}/>
         <div className="epi-metrics">
           {[
             ['Entradas de material', movementValue('Entrada')],
@@ -167,6 +182,7 @@ export function Finance({ data }) {
           ))}
         </div>
       </Panel>
+      <CostBreakdown requests={data.requests.filter(q=>within(q.closed_at,range))}/>
       <Panel title="Despesas por projeto e material">
         <div className="epi-filters">
           {[

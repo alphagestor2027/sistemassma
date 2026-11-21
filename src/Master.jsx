@@ -1,3 +1,4 @@
+import {Integrations} from './Assistant'
 import { GloveIndicators } from './EpiIndicators'
 import { Skeleton } from './Skeleton'
 import React, { useEffect, useState } from 'react'
@@ -145,6 +146,8 @@ export default function Master({ db, days, Trend, managing, navigate }) {
     [notice, setNotice] = useState(''),
     [changingAccess, setChangingAccess] = useState(false),
     [error, setError] = useState('')
+  const [integrations,setIntegrations]=useState(false)
+  useEffect(()=>{setIntegrations(false)},[managing])
   async function reload() {
     const { data, error } = await db.rpc('ssma_master', { action: 'overview', p: {} })
     if (error) {
@@ -240,15 +243,16 @@ export default function Master({ db, days, Trend, managing, navigate }) {
   return (
     <div className="epi">
       <nav className="button-group" aria-label="Administração Master">
-        <button className={managing ? 'secondary' : 'primary'} onClick={() => navigate('master')}>
+        <button className={managing||integrations ? 'secondary' : 'primary'} onClick={() => {setIntegrations(false);navigate('master')}}>
           Visão geral
         </button>
-        <button className={managing ? 'primary' : 'secondary'} onClick={() => navigate('technicians')}>
+        <button className={managing&&!integrations ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);navigate('technicians')}}>
           <Users size={16} />
           Gestão de técnicos
         </button>
+        <button className={integrations?'primary':'secondary'} onClick={()=>setIntegrations(true)}>Integrações de IA</button>
       </nav>
-      {managing ? (
+      {integrations?<Integrations db={db}/>:managing ? (
         <>
           <Panel
             title="Técnicos de segurança"

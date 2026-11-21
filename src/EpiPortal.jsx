@@ -1,3 +1,4 @@
+import {Assistant} from './Assistant'
 import { Skeleton } from './Skeleton'
 import {ThemeToggle} from './ThemeToggle'
 import {NameTracking} from './NameTracking'
@@ -105,7 +106,7 @@ export default function EpiPortal({ db }) {
             Sistema SSMA <b>2.0</b>
           </strong>
         </div>
-        <div><span>Portal do colaborador</span><ThemeToggle/></div>
+        <div><span>Portal do colaborador</span><Assistant db={db} page="portal"/><ThemeToggle/></div>
       </header>
       <main>
         <div className="page-heading">

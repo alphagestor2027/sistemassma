@@ -1,3 +1,4 @@
+import {usePages} from './Pagination'
 import {PriceField} from './PriceField'
 import React, { useState } from 'react'
 import { CaExpiryEditor, CaResult, useCaLookup } from './CaCatalog'
@@ -7,9 +8,9 @@ import { dateLabel, today } from './data'
 
 const materialColors = ['Amarelo', 'Azul', 'Azul-marinho', 'Bege', 'Branco', 'Cinza', 'Incolor', 'Laranja', 'Marrom', 'Multicolorido', 'Preto', 'Rosa', 'Roxo', 'Verde', 'Vermelho', 'Vinho', 'Outra',]
 const numberProps = { type: 'number', min: 0, step: 1 }
-export function Stock({ db, data, profile, save }) {
+export function Stock({ db, data, profile, save, initialFocus }) {
   const [noCA, setNoCA] = useState(false),
-    [search, setSearch] = useState(''),
+    [search, setSearch] = useState(()=>data.materials.find(m=>m.id===initialFocus)?.name||''),
     [show, setShow] = useState('')
   const [ca, setCa] = useState(''),
     [name, setName] = useState(null),
@@ -71,6 +72,7 @@ export function Stock({ db, data, profile, save }) {
     (m) =>
       [variant(m), m.ca].join(' ').toLowerCase().includes(search.toLowerCase()),
   )
+  const pages=usePages(materials,search)
   return (
     <>
       <Panel
@@ -265,7 +267,6 @@ export function Stock({ db, data, profile, save }) {
             'CA',
             'Estoque',
 
-            'Físico',
             'Disponível',
             'Mínimo',
             'Reposição',
@@ -273,12 +274,11 @@ export function Stock({ db, data, profile, save }) {
             'Validade',
             'Ações',
           ]}
-          rows={materials.map((m) => [
+          rows={pages.items.map((m) => [
             variant(m),
             m.no_ca ? <span className="badge red">Sem CA</span> : m.ca,
             regionLabel(data.regions.find(r=>r.id===m.region_id)),
 
-            m.qty,
             available(m),
             m.minimum,
             <span className={'badge ' + (available(m) < m.minimum ? 'red' : 'green')}>{available(m) < m.minimum ? 'Comprar' : 'Ideal'}</span>,
@@ -306,6 +306,7 @@ export function Stock({ db, data, profile, save }) {
           ])}
           empty="Nenhum material encontrado neste estoque."
         />
+        {pages.controls}
       </Panel>
     </>
   )
