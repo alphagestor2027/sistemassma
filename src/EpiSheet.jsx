@@ -22,7 +22,7 @@ async function squareLogo(file) {
   } finally { image.close() }
 }
 
-function EmployeeSheets({db,id,profile,delivered,onIssued}) {
+function EmployeeSheets({db,id,profile,delivered,onIssued,archiveId,onArchiveDeleted}) {
   const [context,setContext] = useState(null), [doc,setDoc] = useState(null), [settings,setSettings] = useState(null)
   const [mode,setMode] = useState('new'), [busy,setBusy] = useState(false), [error,setError] = useState('')
   const [confirm,setConfirm] = useState(false), [template,setTemplate] = useState(false), [reload,setReload] = useState(0)
@@ -34,8 +34,13 @@ function EmployeeSheets({db,id,profile,delivered,onIssued}) {
     let current = true
     setBusy(true)
     setError('')
-    rpc(db,'sheet',{action:'context',p:{employee_id:id}}).then(value => {
+    rpc(db,'sheet',{action:archiveId?'open':'context',p:{employee_id:id,id:archiveId}}).then(value => {
       if (!current) return
+      if (archiveId) {
+        setContext({sheets:[value]})
+        view(value)
+        return
+      }
       setContext(value)
       setDoc(null)
       setMode('new');setItems([])
@@ -45,7 +50,7 @@ function EmployeeSheets({db,id,profile,delivered,onIssued}) {
       setSettings(defaultSettings(value.snapshot,value.template))
     }).catch(e => {if(current) setError(e.message)}).finally(() => {if(current) setBusy(false)})
     return () => {current=false}
-  },[db,id,reload])
+  },[db,id,reload,archiveId])
   async function run(fn) {
     if(lock.current) return
     lock.current=true
@@ -74,12 +79,12 @@ function EmployeeSheets({db,id,profile,delivered,onIssued}) {
     {context && settings && <>
       <Panel title="Fichas emitidas">
         <div className="epi-filters">
-          <Select label="Abrir ficha" options={context.sheets.map(s=>[s.id,'Nº '+s.number+' · '+stamp(s.issued_at)])}
+          {!archiveId && <Select label="Abrir ficha" options={context.sheets.map(s=>[s.id,'Nº '+s.number+' · '+stamp(s.issued_at)])}
             placeholder="Nova ficha" value={doc?.id || ''} disabled={busy} onChange={e=>{
               const key=e.target.value
               if(key) run(async()=>view(await api('open',{id:key})))
               else setReload(n=>n+1)
-            }}/>
+            }}/>}
           {mode==='view' && <>
             <button className="secondary" disabled={busy} onClick={()=>setMode('edit')}>Editar ficha</button>
             <button className="secondary" disabled={busy} onClick={()=>setConfirm(true)}>Excluir ficha</button>
@@ -89,7 +94,7 @@ function EmployeeSheets({db,id,profile,delivered,onIssued}) {
         {doc?.expires_at && <p>Exclusão programada para {stamp(doc.expires_at)}.</p>}
         {confirm && <div className="notice"><p>Excluir a ficha nº {doc.number}? As entregas continuarão no histórico do colaborador.</p>
           <button className="secondary" disabled={busy} onClick={()=>setConfirm(false)}>Cancelar</button>{' '}
-          <button className="primary" disabled={busy} onClick={()=>run(async()=>{await api('delete',{id:doc.id,revision:doc.revision});setReload(n=>n+1)})}>Confirmar exclusão</button>
+          <button className="primary" disabled={busy} onClick={()=>run(async()=>{await api('delete',{id:doc.id,revision:doc.revision});if(archiveId) onArchiveDeleted(); else setReload(n=>n+1)})}>Confirmar exclusão</button>
         </div>}
       </Panel>
       <ReplacementAlert requests={delivered}/>
@@ -131,18 +136,31 @@ function EmployeeSheets({db,id,profile,delivered,onIssued}) {
 export function Sheet({ db, data, profile,onIssued }) {
   const [id,setId]=useState('')
   const [people,setPeople]=useState([]), [error,setError]=useState(''), [attempt,retry]=useState(0)
+  const [archive,setArchive]=useState([]), [archiveId,setArchiveId]=useState('')
+  const archivedSheet=archive.find(s=>s.id===archiveId)
   useEffect(()=>{
     let current=true
-    rpc(db,'sheet',{action:'employees',p:{}}).then(list=>{
-      if(current){setPeople(list);setError('')}
+    const refresh=()=>retry(n=>n+1)
+    window.addEventListener('focus',refresh)
+    Promise.all([rpc(db,'sheet',{action:'employees',p:{}}),profile.is_master?rpc(db,'sheet',{action:'archived',p:{}}):[]]).then(([list,docs])=>{
+      if(current){
+        setPeople(list);setArchive(docs);setError('')
+        setId(selected=>list.some(e=>e.id===selected)?selected:'')
+        setArchiveId(selected=>docs.some(d=>d.id===selected)?selected:'')
+      }
     }).catch(e=>{if(current)setError(e.message)})
-    return ()=>{current=false}
-  },[db,attempt])
+    return ()=>{current=false;window.removeEventListener('focus',refresh)}
+  },[db,attempt,profile.is_master])
   return <>
     <Panel title="Ficha de EPI digital"><p>As fichas são excluídas permanentemente dois anos após a emissão. Salve o PDF em um local seguro. O painel avisa nas últimas 72 horas.</p><Select label="Consultar colaborador" value={id}
-      options={people.map(e=>[e.id,e.name])} onChange={e=>setId(e.target.value)}/></Panel>
+      options={people.map(e=>[e.id,e.name])} onChange={e=>{setId(e.target.value);setArchiveId('')}}/>
+      {archive.length>0 && <Select label="Fichas emitidas de cadastros removidos" value={archiveId}
+        options={archive.map(s=>[s.id,'Nº '+s.number+' · '+stamp(s.issued_at)])}
+        onChange={e=>{setArchiveId(e.target.value);setId('')}}/>}</Panel>
     {error && <p className="notice error" role="alert">{error} <button onClick={()=>retry(attempt+1)}>Tentar novamente</button></p>}
     {id && <EmployeeSheets key={id} db={db} id={id} profile={profile} onIssued={onIssued}
       delivered={data.requests.filter(q=>q.employee_id===id && q.status==='Entregue')}/>}
+    {archivedSheet && <EmployeeSheets key={archiveId} db={db} id={archivedSheet.employee_id} profile={profile} archiveId={archiveId}
+      delivered={[]} onArchiveDeleted={()=>{setArchiveId('');retry(n=>n+1)}}/>}
   </>
 }

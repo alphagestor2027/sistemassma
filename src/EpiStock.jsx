@@ -9,7 +9,6 @@ const materialColors = ['Amarelo', 'Azul', 'Azul-marinho', 'Bege', 'Branco', 'Ci
 const numberProps = { type: 'number', min: 0, step: 1 }
 export function Stock({ db, data, profile, save }) {
   const [noCA, setNoCA] = useState(false),
-    [region, setRegion] = useState(''),
     [search, setSearch] = useState(''),
     [show, setShow] = useState('')
   const [ca, setCa] = useState(''),
@@ -70,7 +69,6 @@ export function Stock({ db, data, profile, save }) {
   ])
   const materials = data.materials.filter(
     (m) =>
-      (!region || (m.region_id || 'none') === region) &&
       [variant(m), m.ca].join(' ').toLowerCase().includes(search.toLowerCase()),
   )
   return (
@@ -247,13 +245,6 @@ export function Stock({ db, data, profile, save }) {
               if (!show) setFicha(0)
             }}
           />
-          {profile.is_master && <Select
-            label="Filtrar estoque"
-            value={region}
-            onChange={(e) => setRegion(e.target.value)}
-            placeholder="Todas as unidades"
-            options={[['none', 'Sem unidade'], ...data.regions.map((r) => [r.id, regionLabel(r)])]}
-          />}
         </div>
         {stockCa && (
           <CaResult

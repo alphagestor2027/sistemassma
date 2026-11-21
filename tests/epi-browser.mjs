@@ -97,6 +97,7 @@ try {
   await button(admin, 'Estoque').click()
   const gloveTitle='Luvas isolantes por unidade de distribuição'
   await admin.getByRole('heading',{name:'Estoque de materiais'}).waitFor()
+  assert.equal(await admin.getByLabel('Filtrar estoque').count(),0)
   assert.equal(await admin.getByRole('heading',{name:gloveTitle}).count(),0)
   assert.equal(await button(admin,'Previsão de compras').count(),0)
   assert.deepEqual(await call(tech,'ssma_epi_glove_summary',{}),[])
