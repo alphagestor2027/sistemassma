@@ -28,13 +28,14 @@ export function Stock({ db, data, profile, save }) {
     setName(material.name)
     setCa(material.ca)
     setNoCA(material.no_ca)
-    setFicha(0)
+    setFicha(null)
     setStart(material.glove_start || '')
     setManualGlove(material.insulating_glove)
   }
   const stockCa = !show && /^\d{1,70}$/.test(search.trim()) ? search.trim() : ''
   const lookup = useCaLookup(db, show === 'lookup' || ((show === 'new' || editing) && !noCA) ? ca : stockCa)
-  const sheet = lookup?.records?.[ficha]
+  const fichaIndex = ficha ?? Math.max(0, lookup?.records?.findIndex(record=>record.sheet_key===editing?.ca_sheet_key) ?? 0)
+  const sheet = lookup?.records?.[fichaIndex]
   const suggested = sheet?.equipamento || ''
   function changeCa(value) {
     setStart('')
@@ -101,7 +102,7 @@ export function Stock({ db, data, profile, save }) {
               value={ca}
               onChange={(e) => changeCa(e.target.value)}
             />
-            <CaResult result={lookup} index={ficha} onSelect={setFicha} onRegister={() => setShow('new')} />
+            <CaResult result={lookup} index={fichaIndex} onSelect={setFicha} onRegister={() => setShow('new')} />
             {sheet && (
               <CaExpiryEditor
                 key={[ca, sheet.sheet_key, sheet.validade_manual].join('/')}
@@ -143,6 +144,7 @@ export function Stock({ db, data, profile, save }) {
                 insulating_glove: glove,
                 glove_start: glove ? start : null,
                 no_ca: noCA,
+                ...(!noCA && sheet && {ca_sheet_key:sheet.sheet_key}),
                 ...(p.ca_expiry && { previous_ca_expiry: sheet?.validade_manual }),
               })
             }
@@ -173,7 +175,7 @@ export function Stock({ db, data, profile, save }) {
               <input type="checkbox" checked={noCA} onChange={(e) => setNoCA(e.target.checked)} />
               Material sem CA
             </label>
-            {!noCA && <CaResult result={lookup} index={ficha} onSelect={setFicha} />}
+            {!noCA && <CaResult result={lookup} index={fichaIndex} onSelect={setFicha} />}
             <PriceField label="Valor unitário (R$)" initialValue={editing?.price} />
             <Field label="Quantidade" name="qty" {...numberProps} min={editing?.reserved || 0} defaultValue={editing?.qty} />
             {sheet && !noCA && (
@@ -257,7 +259,7 @@ export function Stock({ db, data, profile, save }) {
         {stockCa && (
           <CaResult
             result={lookup}
-            index={ficha}
+            index={fichaIndex}
             onSelect={setFicha}
             onRegister={() => {
               setCa(stockCa)
@@ -274,7 +276,6 @@ export function Stock({ db, data, profile, save }) {
             'Estoque',
 
             'Físico',
-            'Reservado',
             'Disponível',
             'Mínimo',
             'Reposição',
@@ -288,7 +289,6 @@ export function Stock({ db, data, profile, save }) {
             regionLabel(data.regions.find(r=>r.id===m.region_id)),
 
             m.qty,
-            m.reserved,
             available(m),
             m.minimum,
             <span className={'badge ' + (available(m) < m.minimum ? 'red' : 'green')}>{available(m) < m.minimum ? 'Comprar' : 'Ideal'}</span>,
@@ -305,7 +305,9 @@ export function Stock({ db, data, profile, save }) {
                   </ActionForm>
                 </details>
               )}
-              <span className={m.expiry && m.expiry < today() ? 'red-text' : ''}>{dateLabel(m.expiry)}</span>
+              {m.ca_expiry && <div>CA · {m.ca_expiry}</div>}
+              {m.expiry && <div className={m.expiry < today() ? 'red-text' : ''}>{m.insulating_glove ? 'Ensaio' : 'Lote'} · {dateLabel(m.expiry)}</div>}
+              {!m.ca_expiry && !m.expiry && '—'}
             </div>,
             <div className="button-group">
               <button className="secondary" aria-label={'Editar ' + variant(m)} onClick={() => selectMaterial(m,'edit')}>Editar</button>

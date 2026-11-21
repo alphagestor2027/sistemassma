@@ -28,6 +28,7 @@ Deno.serve(async (req) => {
     const name = typeof body?.name === 'string' ? body.name.trim() : ''
     const service_region = body?.service_region ?? ''
     const service_state = body?.service_state ?? ''
+    const stock_unit = body?.stock_unit ?? null
     const coverage = body?.coverage
     const password = body?.password
     if (
@@ -39,6 +40,7 @@ Deno.serve(async (req) => {
         (!Array.isArray(coverage) ||
           coverage.length > 27 ||
           coverage.some((uf) => typeof uf !== 'string' || !/^[A-Z]{2}$/.test(uf)))) ||
+      (stock_unit !== null && (typeof stock_unit !== 'string' || !/^[0-9a-f]{8}(?:-[0-9a-f]{4}){3}-[0-9a-f]{12}$/i.test(stock_unit))) ||
       typeof service_region !== 'string' ||
       service_region.length > 16 ||
       typeof service_state !== 'string' ||
@@ -58,7 +60,7 @@ Deno.serve(async (req) => {
       password,
       email_confirm: true,
       app_metadata: {
-        ssma_technician: { created_by: master, name, service_region, service_state, coverage },
+        ssma_technician: { created_by: master, name, service_region, service_state, coverage, stock_unit },
       },
     })
     if (error) {

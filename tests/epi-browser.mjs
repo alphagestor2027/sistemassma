@@ -37,13 +37,13 @@ async function client(actor) {
       let body
       if (name === 'ssma-create-technician') {
         await call(actor, 'ssma_master', { action: 'authorize_creation', p: {} })
-        const { name: displayName, username, coverage } = req.postDataJSON()
+        const { name: displayName, username, coverage, stock_unit } = req.postDataJSON()
         const id = crypto.randomUUID()
         await pg.transaction(async (tx) => {
           await tx.query('insert into auth.users(id,email) values($1,$2)', [id, username + '@ssma.invalid'])
           await tx.query('update auth.users set raw_app_meta_data=$1 where id=$2', [
             JSON.stringify({
-              ssma_technician: { created_by: actor, name: displayName, coverage },
+              ssma_technician: { created_by: actor, name: displayName, coverage, stock_unit },
             }),
             id,
           ])
@@ -162,6 +162,8 @@ try {
   await admin.getByLabel('Nova validade do CA').fill('2030-04-16')
   await button(admin, 'Salvar validade do CA').click()
   await admin.getByText('16/04/2030', { exact: true }).waitFor()
+  await admin.getByRole('cell',{name:/CA · 16\/04\/2030/}).waitFor()
+  assert.equal(await admin.getByRole('columnheader',{name:'Reservado',exact:true}).count(),0)
   await button(admin, 'Cadastrar material').click()
   await admin.getByLabel('Material sem CA').check()
   await admin.getByLabel('Nome do material').fill('Óculos de teste')
@@ -324,12 +326,17 @@ try {
   await admin.getByLabel('Senha inicial').fill('local-fixture-only')
   await admin.getByRole('checkbox', { name: 'Centro-Oeste', exact: true }).check()
   await admin.getByRole('checkbox', { name: 'SP', exact: true }).check()
+  const unitSelect=admin.getByLabel('Unidade de distribuição do técnico')
+  assert.deepEqual((await unitSelect.locator('option').allTextContents()).slice(1).sort(),['DF','Matriz','RJ'])
+  await unitSelect.selectOption({label:'RJ'})
+  const selectedUnit=await unitSelect.inputValue()
   await button(admin, 'Criar conta do técnico').click()
   await admin.getByRole('heading', { name: 'Cadastro de Maria de Teste' }).waitFor()
   const created = (
-    await pg.query("select user_id,permissions from public.ssma_profiles where username='maria.local'")
+    await pg.query("select user_id,permissions,stock_unit from public.ssma_profiles where username='maria.local'")
   ).rows[0]
   assert.deepEqual(created.permissions, [])
+  assert.equal(created.stock_unit,selectedUnit)
   assert.ok(await admin.getByRole('checkbox', { name: 'Centro-Oeste', exact: true }).isChecked())
   assert.ok(await admin.getByRole('checkbox', { name: 'SP', exact: true }).isChecked())
   const techPage = await client(created.user_id)

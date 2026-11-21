@@ -112,6 +112,8 @@ export async function applySheetDistribution(pg) {
 }
 export async function applyTechnicianStock(pg) {
   const dir=new URL('../supabase/migrations/',import.meta.url)
-  const file=(await readdir(dir)).find(f=>f.endsWith('_estoque_do_tecnico.sql'))
-  await pg.exec(await readFile(new URL(file,dir),'utf8'))
+  const files=await readdir(dir)
+  for(const suffix of ['_estoque_do_tecnico.sql','_cadastro_unidade_validade_estoque.sql']){
+    await pg.exec(await readFile(new URL(files.find(f=>f.endsWith(suffix)),dir),'utf8'))
+  }
 }

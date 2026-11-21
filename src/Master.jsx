@@ -273,9 +273,9 @@ export default function Master({ db, days, Trend, managing, navigate }) {
               <>
                 <ActionForm
                   submit="Criar conta do técnico"
-                  onSave={async ({ name, username, password, coverage }) => {
+                  onSave={async ({ name, username, password, coverage, stock_unit }) => {
                     const { data, error } = await db.functions.invoke('ssma-create-technician', {
-                      body: { name, username, password, coverage: JSON.parse(coverage) },
+                      body: { name, username, password, coverage: JSON.parse(coverage), stock_unit: stock_unit || null },
                     })
                     if (error) {
                       const details = await error.context?.json?.().catch(() => null)
@@ -286,7 +286,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     await reload()
                     setEdit(data.id)
                     setCreating(false)
-                    setNotice('Técnico cadastrado. Defina a unidade de distribuição e os módulos que ele poderá acessar.')
+                    setNotice('Técnico cadastrado. Selecione os módulos que ele poderá acessar.')
                   }}
                 >
                   <Field label="Nome completo" name="name" maxLength={120} required />
@@ -308,6 +308,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     minLength={8}
                     maxLength={72}
                   />
+                  <Select label="Unidade de distribuição do técnico" name="stock_unit" placeholder="Estoque individual do técnico" options={(data.units || []).map(u=>[u.id,u.name==='MATRIZ'?'Matriz':u.name])}/>
                   <ServiceAreaFields areas={data.service_areas} />
                 </ActionForm>
                 <button className="text-button" onClick={() => setCreating(false)}>
@@ -394,7 +395,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     options={['Ativo', 'Inativo']}
                     defaultValue={selected.active ? 'Ativo' : 'Inativo'}
                   />
-                  <Select label="Unidade de distribuição do técnico" name="stock_unit" placeholder="Estoque individual do técnico" defaultValue={selected.stock_unit || ''} options={(data.units || []).map(u=>[u.id,u.name])}/>
+                  <Select label="Unidade de distribuição do técnico" name="stock_unit" placeholder="Estoque individual do técnico" defaultValue={selected.stock_unit || ''} options={(data.units || []).map(u=>[u.id,u.name==='MATRIZ'?'Matriz':u.name])}/>
                   <ServiceAreaFields areas={data.service_areas} person={selected} />
                 </ActionForm>
               </Panel>
