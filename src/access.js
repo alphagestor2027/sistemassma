@@ -4,7 +4,6 @@ export const epiSections = {
   Financeiro: 'financeiro',
   'Ficha digital': 'ficha',
   'Ensaios e retornos': 'ensaios',
-  'Previsão de compras': 'compras',
   'Histórico de movimentações': 'historico',
 }
 export function permitted(profile, key) {

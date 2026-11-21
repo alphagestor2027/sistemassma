@@ -95,6 +95,12 @@ try {
   await button(admin, 'Gestão de EPIs').click()
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()
+  const gloveTitle='Luvas isolantes por unidade de distribuição'
+  await admin.getByRole('heading',{name:'Estoque de materiais'}).waitFor()
+  assert.equal(await admin.getByRole('heading',{name:gloveTitle}).count(),0)
+  assert.equal(await button(admin,'Previsão de compras').count(),0)
+  assert.deepEqual(await call(tech,'ssma_epi_glove_summary',{}),[])
+  assert.ok((await call(owner,'ssma_epi_glove_summary',{})).length>0)
   await pg.query("insert into ssma_epi.ca_catalog(ca,fichas) values ('111',$1)", [
     JSON.stringify([
       {
@@ -195,6 +201,8 @@ try {
   assert.ok(await portal.evaluate(() => document.documentElement.scrollWidth <= innerWidth))
 
   await button(admin, 'Solicitações').click()
+  await admin.getByLabel('Situação',{exact:true}).waitFor()
+  assert.equal(await admin.getByLabel('Regional',{exact:true}).count(),0)
   const code = await portal.getByTestId('receipt-code').innerText()
   await admin.getByLabel('Etapa do pedido').selectOption('Enviado pelos Correios')
   await admin.getByLabel('Número de rastreamento dos Correios').fill('AA123456789BR')
@@ -297,6 +305,7 @@ try {
     [owner],
   )
   await button(admin, 'Painel Master').click()
+  await admin.getByRole('heading',{name:gloveTitle}).waitFor()
   await admin.getByLabel('Técnico de segurança', { exact: true }).selectOption(owner)
   await admin.getByLabel('Região', { exact: true }).selectOption('Centro-Oeste')
   const ufFilter = admin.getByLabel('Estado', { exact: true })

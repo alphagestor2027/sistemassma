@@ -5,11 +5,10 @@ import {
   Wallet,
   FileText,
   FlaskConical,
-  CalendarDays,
   Archive,
   ExternalLink,
 } from 'lucide-react'
-import { Stock, Planning } from './EpiStock'
+import { Stock } from './EpiStock'
 import { StockHistory } from './StockHistory'
 import { Sheet } from './EpiSheet'
 import { Requests, Finance, Tests } from './EpiOperations'
@@ -23,7 +22,6 @@ const tabs = [
   ['Financeiro', Wallet],
   ['Ficha digital', FileText],
   ['Ensaios e retornos', FlaskConical],
-  ['Previsão de compras', CalendarDays],
   ['Histórico de movimentações', Archive],
 ]
 export default function EpiModule({ db, profile, employees, initialTab = 'Estoque', onChange }) {
@@ -115,7 +113,6 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
             {tab === 'Financeiro' && <Finance {...props} />}
             {tab === 'Ficha digital' && <Sheet {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
             {tab === 'Ensaios e retornos' && <Tests {...props} />}{' '}
-            {tab === 'Previsão de compras' && <Planning {...props} />}
           </>
         )}
       </div>

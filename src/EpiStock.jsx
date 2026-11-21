@@ -1,9 +1,8 @@
 import {PriceField} from './PriceField'
-import { GloveIndicators } from './EpiIndicators'
 import React, { useState } from 'react'
 import { CaExpiryEditor, CaResult, useCaLookup } from './CaCatalog'
 import { Panel, ActionForm, Field, Select, Table, rpc } from './EpiShared'
-import { available, variant, regionLabel, forecast, money, after365 } from './epiData'
+import { available, variant, regionLabel, money, after365 } from './epiData'
 import { dateLabel, today } from './data'
 
 const materialColors = ['Amarelo', 'Azul', 'Azul-marinho', 'Bege', 'Branco', 'Cinza', 'Incolor', 'Laranja', 'Marrom', 'Multicolorido', 'Preto', 'Rosa', 'Roxo', 'Verde', 'Vermelho', 'Vinho', 'Outra',]
@@ -248,13 +247,13 @@ export function Stock({ db, data, profile, save }) {
               if (!show) setFicha(0)
             }}
           />
-          <Select
+          {profile.is_master && <Select
             label="Filtrar estoque"
             value={region}
             onChange={(e) => setRegion(e.target.value)}
             placeholder="Todas as unidades"
             options={[['none', 'Sem unidade'], ...data.regions.map((r) => [r.id, regionLabel(r)])]}
-          />
+          />}
         </div>
         {stockCa && (
           <CaResult
@@ -315,92 +314,6 @@ export function Stock({ db, data, profile, save }) {
             </div>,
           ])}
           empty="Nenhum material encontrado neste estoque."
-        />
-      </Panel>
-      <GloveIndicators db={db} revision={data} />
-    </>
-  )
-}
-
-export function Planning({ data, save }) {
-  const [horizon, setHorizon] = useState(30)
-  return (
-    <>
-      <Panel title="Periodicidade de troca por cargo">
-        <ActionForm submit="Salvar periodicidade" onSave={(p) => save('rule', p)}>
-          <Select
-            label="Material e regional"
-            name="material_id"
-            options={data.materials
-              .filter((m) => m.region_id)
-              .map((m) => [
-                m.id,
-                variant(m) + ' · ' + regionLabel(data.regions.find((r) => r.id === m.region_id)),
-              ])}
-            required
-          />
-          <Field label="Cargo" name="job" list="epi-jobs" required />
-          <datalist id="epi-jobs">
-            {[...new Set(data.assignments.map((a) => a.job))].map((j) => (
-              <option key={j}>{j}</option>
-            ))}
-          </datalist>
-          <Field label="Troca a cada (dias)" name="days" type="number" min={1} required />
-          <Field label="Quantidade por troca" name="qty" type="number" min={1} defaultValue={1} required />
-        </ActionForm>
-        <Table
-          headers={['Material', 'Regional', 'Cargo', 'Intervalo', 'Quantidade']}
-          rows={data.rules.map((r) => {
-            const m = data.materials.find((m) => m.id === r.material_id)
-            return [
-              variant(m),
-              regionLabel(data.regions.find((v) => v.id === m.region_id)),
-              r.job,
-              r.days + ' dias',
-              r.qty,
-            ]
-          })}
-        />
-      </Panel>
-      <Panel
-        title="Previsão de compras"
-        action={
-          <Select
-            label="Horizonte"
-            value={horizon}
-            options={[30, 60, 90, 180].map((n) => [n, n + ' dias'])}
-            onChange={(e) => setHorizon(Number(e.target.value))}
-          />
-        }
-      >
-        <p className="epi-help">
-          A previsão considera colaboradores ativos por cargo e regional, última entrega, reservas e estoque
-          mínimo. Sem entrega anterior, a primeira troca entra na previsão de hoje.
-        </p>
-        <Table
-          headers={[
-            'Material / grade',
-            'Regional',
-
-            'Disponível',
-            'Mínimo',
-            'Demanda prevista',
-            'Comprar',
-            'Custo estimado',
-          ]}
-          rows={data.materials.map((m) => {
-            const f = forecast(m, data.rules, data.assignments, data.requests, horizon)
-            return [
-              variant(m),
-              regionLabel(data.regions.find((r) => r.id === m.region_id)),
-
-              available(m),
-              m.minimum,
-              f.demand,
-              f.buy,
-              money(f.buy * m.price),
-            ]
-          })}
         />
       </Panel>
     </>

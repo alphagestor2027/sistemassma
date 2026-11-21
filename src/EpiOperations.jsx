@@ -1,6 +1,6 @@
 import React, { useState } from 'react'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
-import { money, variant, regionLabel, expenseGroups, stamp, nextStatus } from './epiData'
+import { money, variant, expenseGroups, stamp, nextStatus } from './epiData'
 import { today, dateLabel } from './data'
 
 const stages = [
@@ -12,11 +12,8 @@ const stages = [
 ]
 
 export function Requests({ data, profile, save, refresh }) {
-  const [status, setStatus] = useState(''),
-    [region, setRegion] = useState('')
-  const list = data.requests.filter(
-    (q) => (!status || q.status === status) && (!region || q.region_id === region),
-  )
+  const [status, setStatus] = useState('')
+  const list = data.requests.filter(q => !status || q.status === status)
   return (
     <Panel
       title="Solicitações dos colaboradores"
@@ -33,13 +30,6 @@ export function Requests({ data, profile, save, refresh }) {
           value={status}
           onChange={(e) => setStatus(e.target.value)}
           options={['Solicitado', 'Entregue', 'Cancelado']}
-        />
-        <Select
-          label="Regional"
-          placeholder="Todas as regionais"
-          value={region}
-          onChange={(e) => setRegion(e.target.value)}
-          options={data.regions.map((r) => [r.id, regionLabel(r)])}
         />
       </div>
       {list.map((q) => {
@@ -131,13 +121,11 @@ export function Requests({ data, profile, save, refresh }) {
 }
 
 export function Finance({ data }) {
-  const [region, setRegion] = useState(''),
-    [project, setProject] = useState(''),
+  const [project, setProject] = useState(''),
     [center, setCenter] = useState(''),
     [contract, setContract] = useState('')
-  const regional = data.requests.filter((q) => !region || q.region_id === region)
-  const movements = data.movements.filter((m) => !region || m.region_id === region)
-  const groups = expenseGroups(regional)
+  const {movements} = data
+  const groups = expenseGroups(data.requests)
   const sum = (list, fn) => list.reduce((s, x) => s + fn(x), 0)
   const movementValue = (kind) =>
     sum(
@@ -157,23 +145,7 @@ export function Finance({ data }) {
   )
   return (
     <>
-      <Panel
-        title="Movimentação financeira"
-        action={
-          <Select
-            label="Regional"
-            placeholder="Todas as regionais"
-            value={region}
-            options={data.regions.map((r) => [r.id, regionLabel(r)])}
-            onChange={(e) => {
-              setRegion(e.target.value)
-              setProject('')
-              setCenter('')
-              setContract('')
-            }}
-          />
-        }
-      >
+      <Panel title="Movimentação financeira">
         <div className="epi-metrics">
           {[
             ['Entradas de material', movementValue('Entrada')],
@@ -182,7 +154,7 @@ export function Finance({ data }) {
             [
               'Saldo financeiro em estoque · SSMA',
               sum(
-                data.materials.filter((m) => !region || m.region_id === region),
+                data.materials,
                 (m) => m.qty * Math.round(m.price * 100),
               ) / 100,
             ],
