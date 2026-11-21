@@ -275,6 +275,14 @@ try {
   await sheet.getByRole('cell',{name:'111',exact:true}).waitFor()
   await button(admin,'Histórico de movimentações').click()
   await admin.getByRole('cell',{name:'Saída',exact:true}).waitFor()
+  await button(admin,'Limpar todo o histórico').click()
+  await button(admin,'Cancelar').click()
+  await admin.getByRole('cell',{name:'Saída',exact:true}).waitFor()
+  await button(admin,'Limpar todo o histórico').click()
+  await button(admin,'Confirmar limpeza').click()
+  await admin.getByText('Nenhuma movimentação no período selecionado.').waitFor()
+  await button(admin,'Financeiro').click()
+  await admin.getByText('Nenhuma entrega confirmada para este filtro.').waitFor()
   await button(admin, 'Ensaios e retornos').click()
   await admin.getByLabel('Entrega confirmada').selectOption({ index: 1 })
   await admin.getByLabel('Equipamento entregue').selectOption({ index: 1 })
@@ -300,7 +308,7 @@ try {
   await admin.getByRole('article',{name:'Ficha de EPI para impressão'}).getByRole('cell',{name:'Inicial',exact:true}).waitFor()
   assert.equal((await pg.query("select qty from ssma_epi.materials where ca='111'")).rows[0].qty,0)
   await button(admin,'Financeiro').click()
-  await admin.getByRole('cell',{name:'R$ 90,00',exact:true}).first().waitFor()
+  await admin.getByRole('heading',{name:'Despesas por projeto e material'}).locator('..').locator('..').getByRole('cell',{name:'R$ 30,00',exact:true}).waitFor()
   await pg.query(
     "insert into public.ssma_records(owner_id,module,title,unit,event_date) values ($1,'acidentes','Acidente DF','Obra / DF','2020-01-02'),($1,'acidentes','Acidente SP','Base / SP','2020-01-02'),($1,'acidentes','Acidente anterior','Obra / DF','2020-01-01')",
     [owner],

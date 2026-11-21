@@ -125,7 +125,7 @@ export function Finance({ data }) {
     [center, setCenter] = useState(''),
     [contract, setContract] = useState('')
   const {movements} = data
-  const groups = expenseGroups(data.requests)
+  const groups = expenseGroups(data.requests.filter(request => !request.finance_cleared))
   const sum = (list, fn) => list.reduce((s, x) => s + fn(x), 0)
   const movementValue = (kind) =>
     sum(
