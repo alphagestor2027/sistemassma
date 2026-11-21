@@ -91,7 +91,7 @@ export function ActionForm({ children, submit, onSave, onDone, disabled = false 
       <fieldset disabled={busy || disabled}>
         {children}
         <div className="epi-form-end">
-          <button className="primary" disabled={busy || disabled}>
+          <button className="primary" aria-busy={busy} disabled={busy || disabled}>
             {busy ? 'Salvando…' : submit}
           </button>
         </div>

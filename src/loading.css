@@ -1,0 +1,37 @@
+.loading-skeleton,.skeleton-activity,button[aria-busy="true"] {
+  --skeleton-base:#e1e5eb;
+  --skeleton-light:#f4f6f9;
+}
+[data-theme="dark"] :is(.loading-skeleton,.skeleton-activity) {
+  --skeleton-base:#303947;
+  --skeleton-light:#485466;
+}
+.skeleton-block,.skeleton-surface .skeleton-block {
+  display:block;
+  border-radius:5px;
+  background:linear-gradient(105deg,var(--skeleton-base) 25%,var(--skeleton-light) 45%,var(--skeleton-base) 65%);
+  background-size:220% 100%;
+  animation:ssma-loading 1.45s ease-in-out infinite;
+}
+.skeleton-surface {padding:clamp(16px,2vw,26px);background:var(--skeleton-surface,#fff);border:1px solid var(--line,#dfe4eb);border-radius:12px}
+[data-theme="dark"] .skeleton-surface {--skeleton-surface:#1c222b}
+.skeleton-title {width:32%;max-width:240px;height:16px;margin-bottom:20px}
+.skeleton-cards {display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:12px;margin-bottom:18px}
+.skeleton-card {padding:15px;border:1px solid var(--line,#dfe4eb);border-radius:8px}
+.skeleton-card i {width:65%;height:9px;margin-bottom:12px}
+.skeleton-card b {width:33%;height:22px}
+.skeleton-row {display:grid;grid-template-columns:2fr 1fr 1fr;gap:9%;padding:12px 0}
+.skeleton-row span {height:11px}
+.skeleton-row:last-child span:first-child {width:76%}
+.skeleton-compact .skeleton-row {padding:2px 0}
+.skeleton-activity {position:fixed;z-index:10000;inset:0 0 auto;height:4px;pointer-events:none;--skeleton-base:#a91d33;--skeleton-light:#ff95a4}
+[data-theme="dark"] .skeleton-activity {--skeleton-base:#bd344a;--skeleton-light:#ffabb6}
+.skeleton-boot {width:min(85vw,520px);margin:18vh auto}
+@media (prefers-color-scheme:dark) {
+  html:not([data-theme]) .skeleton-boot {--skeleton-base:#303947;--skeleton-light:#485466;--skeleton-surface:#1c222b;--line:#353e4a}
+}
+button[aria-busy="true"] {background-image:linear-gradient(105deg,transparent 25%,#ffffff38 48%,transparent 70%);background-size:220% 100%;animation:ssma-loading 1.45s ease-in-out infinite}
+@keyframes ssma-loading {from{background-position:100% 0}to{background-position:-100% 0}}
+@media (max-width:600px) {.skeleton-cards{grid-template-columns:repeat(2,minmax(0,1fr))}}
+@media (prefers-reduced-motion:reduce) {.skeleton-block,.skeleton-surface .skeleton-block,button[aria-busy="true"]{animation:none}}
+@media print {.loading-skeleton,.skeleton-activity{display:none!important}}

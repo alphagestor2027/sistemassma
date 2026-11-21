@@ -10,7 +10,7 @@ const browser = await chromium.launch({
 })
 const base = process.env.APP_URL || 'http://127.0.0.1:5173'
 const failures = []
-async function client(actor) {
+async function client(actor, beforeRequest) {
   const context = await browser.newContext()
   const user = {
     id: actor,
@@ -34,6 +34,7 @@ async function client(actor) {
       url = new URL(req.url()),
       name = url.pathname.split('/').pop()
     try {
+      if (beforeRequest) await beforeRequest(name)
       let body
       if (name === 'ssma-create-technician') {
         await call(actor, 'ssma_master', { action: 'authorize_creation', p: {} })
@@ -63,7 +64,7 @@ async function client(actor) {
         body = await pg.transaction(async (tx) => {
           await tx.exec('set local role authenticated')
           await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [actor])
-          return (await tx.query('select * from public.ssma_records')).rows
+          return (await tx.query('select to_jsonb(r) as record from public.ssma_records r')).rows.map(row=>row.record)
         })
       else if (name === 'user') body = user
       else body = await call(actor, name, req.postDataJSON() || {})
@@ -190,9 +191,20 @@ try {
   await button(admin,'Excluir Óculos de teste').click()
   await button(admin,'Confirmar exclusão').click()
   await example.waitFor({state:'detached'})
-  const portal = await client(null)
+  let releaseNames
+  const pendingNames=new Promise(resolve=>{releaseNames=resolve})
+  const portal = await client(null,name=>name==='ssma_epi_portal'?pendingNames:undefined)
   await portal.setViewportSize({ width: 390, height: 844 })
   await portal.goto(link)
+  const skeleton=portal.getByRole('status',{name:'Carregando colaboradores…'})
+  try {
+    await skeleton.waitFor()
+    await portal.getByRole('progressbar',{name:'Carregando dados'}).waitFor()
+    await portal.emulateMedia({reducedMotion:'reduce'})
+    assert.equal(await skeleton.locator('.skeleton-title').evaluate(el=>getComputedStyle(el).animationName),'none')
+  } finally {releaseNames()}
+  await skeleton.waitFor({state:'detached'})
+  await portal.emulateMedia({reducedMotion:'no-preference'})
   await portal.getByLabel('Nome do colaborador').selectOption(employee)
   assert.equal(await portal.getByLabel('Estado', { exact: true }).count(),0)
   await portal.getByLabel('Quantidade de Luva isolante · Tam. M').fill('2')
@@ -313,6 +325,16 @@ try {
     "insert into public.ssma_records(owner_id,module,title,unit,event_date) values ($1,'acidentes','Acidente DF','Obra / DF','2020-01-02'),($1,'acidentes','Acidente SP','Base / SP','2020-01-02'),($1,'acidentes','Acidente anterior','Obra / DF','2020-01-01')",
     [owner],
   )
+  const dashboardToday=await admin.evaluate(()=>new Date().toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}))
+  await pg.query("insert into public.ssma_records(owner_id,module,title,unit,event_date,details) select $1,'acidentes','Teste de período','Obra / DF',$2::date-offset_days,jsonb_build_object('extra','Acidente') from unnest(array[0,29,30,89,90,364,365,-1]) offset_days",[owner,dashboardToday])
+  await admin.reload()
+  await button(admin,'Dashboard Geral').click()
+  assert.equal(await admin.getByLabel('Filtrar por unidade').count(),0)
+  for (const [days,count] of [[30,2],[90,4],[365,6]]) {
+    await admin.getByLabel('Período dos indicadores').selectOption(String(days))
+    await admin.getByRole('img',{name:`Evolução no período: ${count} acidentes e 0 incidentes`}).waitFor()
+    assert.equal(await admin.locator('.kpi').filter({hasText:'Acidentes no período'}).locator('strong').textContent(),String(count))
+  }
   await button(admin, 'Painel Master').click()
   await admin.getByRole('heading',{name:gloveTitle}).waitFor()
   await admin.getByLabel('Técnico de segurança', { exact: true }).selectOption(owner)
@@ -331,7 +353,7 @@ try {
   await admin.getByLabel('Data final').fill('2020-01-01')
   await admin.getByRole('alert').filter({ hasText: 'Informe as duas datas' }).waitFor()
   await admin.getByLabel('Período', { exact: true }).selectOption('7')
-  assert.equal(await accidentCard.locator('strong').textContent(), '0')
+  assert.equal(await accidentCard.locator('strong').textContent(), '1')
   await ufFilter.selectOption('DF')
   await admin.getByRole('cell', { name: 'Projeto Norte', exact: true }).waitFor()
   await admin

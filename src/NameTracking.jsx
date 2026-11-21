@@ -1,6 +1,7 @@
 import React,{useRef,useState} from 'react'
 import {Field,Select,Table,rpc} from './EpiShared'
 import {stamp} from './epiData'
+import {Skeleton} from './Skeleton'
 
 export function NameTracking({db}){
   const [name,setName]=useState(''),[matches,setMatches]=useState(null),[id,setId]=useState('')
@@ -27,6 +28,7 @@ export function NameTracking({db}){
   return <><form className="epi-access" onSubmit={e=>{e.preventDefault();search('')}}>
     <Field label="Nome completo para rastreamento" value={name} required minLength={2} maxLength={254} onChange={e=>{revision.current++;setBusy(false);setName(e.target.value);setId('');setMatches(null);setRows(null);setError('')}}/>
     <button className="secondary" disabled={busy}>Consultar pelo nome</button></form>
+    {busy && <Skeleton layout="compact" label="Consultando pedidos…"/>}
     {matches?.length>1 && <Select label="Escolha o colaborador e projeto" value={id} options={matches.map(m=>[m.id,m.name+' · '+m.project])} onChange={e=>{if(e.target.value)search(e.target.value)}}/>}
     {matches?.length===0 && <p role="status">Nenhum colaborador encontrado com esse nome completo.</p>}
     {error && <p className="form-error" role="alert">{error}</p>}

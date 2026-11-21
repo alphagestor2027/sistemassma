@@ -1,4 +1,5 @@
 import { GloveIndicators } from './EpiIndicators'
+import { Skeleton } from './Skeleton'
 import React, { useEffect, useState } from 'react'
 import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2 } from 'lucide-react'
 import { modules, groups } from './config'
@@ -204,7 +205,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
         <button onClick={reload}>Tentar novamente</button>
       </div>
     )
-  if (!data) return <p className="notice">Carregando indicadores…</p>
+  if (!data) return <Skeleton layout={managing?'table':'dashboard'} label="Carregando indicadores…"/>
   const people = data.people,
     projects = data.projects.filter((p) => !tech || p.tech === tech),
     selected = people.find((p) => p.id === edit)
@@ -538,7 +539,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                 Incidentes
               </span>
             </div>
-            {validPeriod && <Trend rows={rows} demo={false} period={period} />}
+            {validPeriod && <Trend rows={rows} period={period} />}
           </Panel>
           <Panel title="Conformidade por área">
             <Table

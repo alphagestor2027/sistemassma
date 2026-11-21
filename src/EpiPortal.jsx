@@ -1,3 +1,4 @@
+import { Skeleton } from './Skeleton'
 import {ThemeToggle} from './ThemeToggle'
 import {NameTracking} from './NameTracking'
 import { ReplacementAlert } from './EpiIndicators'
@@ -45,7 +46,6 @@ export default function EpiPortal({ db }) {
     let active = true
     setError('')
     setLoading(true)
-    setContext(null)
     const action = employee ? 'context' : 'names'
     rpc(db, 'portal', { action, p: { employee_id: employee } })
       .then((result) => {
@@ -54,7 +54,7 @@ export default function EpiPortal({ db }) {
         else setContext(result)
       })
       .catch((e) => {
-        if (active) setError(e.message)
+        if (active) {setContext(null);setError(e.message)}
       })
       .finally(() => {
         if (active) setLoading(false)
@@ -133,10 +133,8 @@ export default function EpiPortal({ db }) {
           </div>
           <p className="epi-help">Se o seu nome não estiver na lista, entre em contato com o SSMA.</p>
         </Panel>
-        {loading && (
-          <p role="status" className="notice">
-            Consultando o estoque e os vínculos…
-          </p>
+        {loading && !context && (
+          <Skeleton layout={employee?'table':'compact'} label={employee?'Consultando o estoque e os vínculos…':'Carregando colaboradores…'}/>
         )}
         {message && (
           <p role="status" className="epi-success">
@@ -173,7 +171,7 @@ export default function EpiPortal({ db }) {
                 <button
                   type="button"
                   className="text-button"
-                  disabled={busy}
+                  disabled={busy || loading}
                   onClick={() => {
                     setCounts({})
                     formKey.current = null
@@ -202,7 +200,7 @@ export default function EpiPortal({ db }) {
                           max={m.available}
                           step="1"
                           placeholder="0"
-                          disabled={busy}
+                          disabled={busy || loading}
                           value={counts[m.id] ?? ''}
                           onChange={(e) => {
                             formKey.current = null
@@ -217,7 +215,7 @@ export default function EpiPortal({ db }) {
                   </div>
                   <p className="epi-help">Ao enviar, guarde o código de rastreio. Ele aparece uma única vez na confirmação.</p>
                   <div className="epi-submit">
-                    <button className="primary" disabled={busy || !Object.values(counts).some((n) => n > 0)}>
+                    <button className="primary" aria-busy={busy} disabled={busy || loading || !Object.values(counts).some((n) => n > 0)}>
                       {busy ? 'Enviando…' : 'Enviar solicitação'}
                     </button>
                   </div>
@@ -259,6 +257,7 @@ export default function EpiPortal({ db }) {
               {checking ? 'Consultando…' : 'Consultar andamento'}
             </button>
           </form>
+          {checking && <Skeleton layout="compact" label="Consultando andamento…"/>}
           <NameTracking db={db}/>
           {trackingError && (
             <p role="alert" className="form-error">

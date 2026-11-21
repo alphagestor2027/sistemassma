@@ -8,6 +8,7 @@ import {
   Archive,
   ExternalLink,
 } from 'lucide-react'
+import { Skeleton } from './Skeleton'
 import { Stock } from './EpiStock'
 import { StockHistory } from './StockHistory'
 import { Sheet } from './EpiSheet'
@@ -105,7 +106,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
         {tab === 'Histórico de movimentações' ? (
           <StockHistory db={db} profile={profile}/>
         ) : !data || !profile ? (
-          !error && <p className="notice">Carregando o módulo de EPI…</p>
+          !error && <Skeleton label="Carregando o módulo de EPI…"/>
         ) : (
           <>
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}

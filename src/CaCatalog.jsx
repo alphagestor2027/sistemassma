@@ -1,3 +1,4 @@
+import { Skeleton } from './Skeleton'
 import React, { useEffect, useState } from 'react'
 import { dateLabel } from './data'
 import { Field } from './EpiShared'
@@ -55,7 +56,7 @@ export function CaResult({ result, index, onSelect, onRegister }) {
   if (!result) return null
   let notice
   if (result.invalid) notice = 'Use apenas os números do CA para consultar a base.'
-  else if (result.loading) notice = 'Consultando CA…'
+  else if (result.loading) return <Skeleton layout="compact" label="Consultando CA…"/>
   else if (result.error) notice = 'Não foi possível consultar a base de CA.'
   else if (!result.records.length) notice = 'CA ' + result.number + ' não encontrado na base importada.'
   if (notice)

@@ -1,3 +1,4 @@
+import { Skeleton } from './Skeleton'
 import React, { useEffect, useRef, useState } from 'react'
 import { Field, Panel, Select, rpc } from './EpiShared'
 import { ReplacementAlert } from './EpiIndicators'
@@ -75,7 +76,7 @@ function EmployeeSheets({db,id,profile,delivered,onIssued,archiveId,onArchiveDel
   const snapshot = doc?.snapshot || context?.snapshot
   return <>
     {error && <div role="alert" className="notice error">{error} <button className="secondary" disabled={busy} onClick={()=>setReload(n=>n+1)}>Recarregar fichas</button></div>}
-    {busy && !context && <p role="status">Carregando fichas…</p>}
+    {busy && !context && <Skeleton label="Carregando fichas…"/>}
     {context && settings && <>
       <Panel title="Fichas emitidas">
         <div className="epi-filters">
