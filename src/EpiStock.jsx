@@ -1,41 +1,11 @@
+import {PriceField} from './PriceField'
 import { GloveIndicators } from './EpiIndicators'
 import React, { useState } from 'react'
 import { CaExpiryEditor, CaResult, useCaLookup } from './CaCatalog'
-import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
+import { Panel, ActionForm, Field, Select, Table, rpc } from './EpiShared'
 import { available, variant, regionLabel, forecast, money, after365 } from './epiData'
 import { dateLabel, today } from './data'
 
-function PriceField({ label, placeholder, initialValue }) {
-  const [value, setValue] = useState(() => initialValue == null ? '' : Number(initialValue).toLocaleString('pt-BR', {minimumFractionDigits:2, maximumFractionDigits:2}))
-  const plain = value.replaceAll('.', '').replace(',', '.')
-  return (
-    <>
-      <Field
-        label={label}
-        placeholder={placeholder || 'R$ 0,00'}
-        inputMode="decimal"
-        value={value ? 'R$ ' + value : ''}
-        onChange={(e) => {
-          const raw = e.target.value.replace(/[^0-9,]/g, '')
-          const [whole, ...parts] = raw.split(',')
-          setValue(
-            raw
-              ? (Number(whole) || 0).toLocaleString('pt-BR') +
-                  (parts.length ? ',' + parts.join('').slice(0, 2) : '')
-              : '',
-          )
-        }}
-        onBlur={() => {
-          if (value)
-            setValue(
-              Number(plain).toLocaleString('pt-BR', { minimumFractionDigits: 2, maximumFractionDigits: 2 }),
-            )
-        }}
-      />
-      <input type="hidden" name="price" value={plain} />
-    </>
-  )
-}
 const materialColors = ['Amarelo', 'Azul', 'Azul-marinho', 'Bege', 'Branco', 'Cinza', 'Incolor', 'Laranja', 'Marrom', 'Multicolorido', 'Preto', 'Rosa', 'Roxo', 'Verde', 'Vermelho', 'Vinho', 'Outra',]
 const numberProps = { type: 'number', min: 0, step: 1 }
 export function Stock({ db, data, profile, save }) {
@@ -80,7 +50,16 @@ export function Stock({ db, data, profile, save }) {
     changeCa('')
     setName(null)
   }
-  const regionalOptions = data.regions.filter(r => r.distribution_unit).map(r => [r.id, r.distribution_unit])
+  const needsTechnician=profile.is_master && (show==='new' || (editing && !editing.region_id))
+  const [technicians,setTechnicians]=useState(null),[directoryError,setDirectoryError]=useState(''),[retryDirectory,setRetryDirectory]=useState(0)
+  React.useEffect(()=>{
+    if(!needsTechnician)return
+    let active=true
+    setTechnicians(null);setDirectoryError('')
+    rpc(db,'manage',{action:'stock_technicians',p:{}}).then(list=>{if(active)setTechnicians(list)})
+      .catch(err=>{if(active)setDirectoryError(err.message)})
+    return ()=>{active=false}
+  },[db,needsTechnician,retryDirectory])
   const [start, setStart] = useState(''),
     [manualGlove, setManualGlove] = useState(false)
   const detected = /luva.*isolante/i.test(name || '') || /luva.*isolante/i.test(suggested)
@@ -242,14 +221,11 @@ export function Stock({ db, data, profile, save }) {
                 ...(editing?.color && !materialColors.includes(editing.color) ? [editing.color] : []),
               ]}
             />
-            <Select
-              label="Unidade de distribuição"
-              name="region_id"
-              options={regionalOptions}
-              placeholder="Selecione a unidade"
-              defaultValue={editing?.region_id}
-              required
-            />
+            {needsTechnician && (directoryError?<p role="alert">{directoryError} <button type="button" className="secondary" onClick={()=>setRetryDirectory(n=>n+1)}>Tentar novamente</button></p>:
+              technicians?.length===1?<><p>Estoque do técnico responsável · {technicians[0].name}</p>
+                <input type="hidden" name="technician_id" value={technicians[0].id}/></>:
+              <Select label="Técnico responsável pelo estoque" name="technician_id" options={(technicians || []).map(t=>[t.id,t.name])} required/>)}
+            {needsTechnician && technicians?.length===0 && <p role="status">Conceda a permissão de estoque a um técnico em Gestão de técnicos.</p>}
             {editing && <button className="secondary" type="button" onClick={() => setShow('')}>Cancelar edição</button>}
           </ActionForm>
         )}
@@ -295,7 +271,7 @@ export function Stock({ db, data, profile, save }) {
           headers={[
             'Material / grade',
             'CA',
-            'Unidade de distribuição',
+            'Estoque',
 
             'Físico',
             'Reservado',
@@ -309,16 +285,7 @@ export function Stock({ db, data, profile, save }) {
           rows={materials.map((m) => [
             variant(m),
             m.no_ca ? <span className="badge red">Sem CA</span> : m.ca,
-            !m.region_id && (profile.is_master || m.owner_id === profile.user_id) ? (
-              <ActionForm
-                submit="Definir unidade"
-                onSave={(p) => save('allocate', { ...p, material_id: m.id })}
-              >
-                <Select label="Unidade do material" name="region_id" options={regionalOptions} required />
-              </ActionForm>
-            ) : (
-              regionLabel(data.regions.find((r) => r.id === m.region_id))
-            ),
+            regionLabel(data.regions.find(r=>r.id===m.region_id)),
 
             m.qty,
             m.reserved,

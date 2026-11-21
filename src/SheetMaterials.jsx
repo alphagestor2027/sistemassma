@@ -17,7 +17,7 @@ export function SheetMaterials({materials,items,setItems,project}) {
       <Field label="Quantidade para entrega" type="number" min={1} step={1} max={selected?.available} value={qty} onChange={e=>setQty(e.target.value)}/>
       <Select label="Motivo da entrega" options={deliveryReasons} value={reason} onChange={e=>setReason(e.target.value)}/>
       <button className="secondary" type="button" disabled={!selected || !reason || !Number.isInteger(Number(qty)) || Number(qty)<1 || Number(qty)>selected.available} onClick={include}>Incluir material na ficha</button></div></>:
-      <p>Nenhum material disponível para entrega. Confira a unidade do projeto, a UF do colaborador e o saldo disponível.</p>}
+      <p>Nenhum material disponível para entrega. Confira o projeto do colaborador, o técnico responsável e o saldo disponível.</p>}
     {items.length>0 && <Table headers={['Material','Quantidade','Motivo','Ações']} rows={items.map(i=>[materials.find(m=>m.id===i.id)?.name,i.qty,i.reason,
       <button type="button" className="secondary" onClick={()=>setItems(items.filter(item=>item.id!==i.id))}>Retirar da ficha</button>])}/>}
   </section>

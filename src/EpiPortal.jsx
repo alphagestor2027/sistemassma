@@ -160,7 +160,6 @@ export default function EpiPortal({ db }) {
                 ...(context.registration?[['Matrícula',context.registration]]:context.cpf_masked?[['CPF',context.cpf_masked]]:[]),
                 ['Região',context.area],
                 ['Técnico de segurança', context.technician],
-                ['Unidade de distribuição', context.region],
               ].map(([label, v]) => (
                 <div key={label}>
                   <small>{label}</small>
@@ -224,7 +223,7 @@ export default function EpiPortal({ db }) {
                   </div>
                 </form>
               ) : (
-                <p className="epi-empty">Não há material disponível no estoque desta unidade.</p>
+                <p className="epi-empty">Não há material disponível para o seu projeto no estoque do técnico responsável.</p>
               )}
             </Panel>
             <Panel title="Histórico de solicitações">

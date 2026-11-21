@@ -323,7 +323,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                   p.name,
                   p.username,
                   areaSummary(data.service_areas, p.coverage),
-                  data.units?.find(u=>u.id===p.stock_unit)?.name || 'A definir',
+                  data.units?.find(u=>u.id===p.stock_unit)?.name || 'Estoque individual',
                   p.active ? 'Ativo' : 'Bloqueado',
                   <div className="technician-actions">
                     <button
@@ -354,18 +354,6 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                 ])}
               empty="Nenhum técnico cadastrado. Use Cadastrar técnico para criar a primeira conta."
             />
-          </Panel>
-          <Panel title="Unidade de distribuição por projeto">
-            <ActionForm submit="Salvar unidade do projeto" onSave={async p=>{
-              const {error}=await db.rpc('ssma_epi_manage',{action:'project_unit',p})
-              if(error) throw error
-              await reload()
-              setNotice('Unidade do projeto atualizada.')
-            }}>
-              <Select label="Projeto" name="project" options={(data.routing || []).map(p=>p.project)} required/>
-              <Select label="Unidade que atende o projeto" name="region_id" options={(data.units || []).map(u=>[u.id,u.name])} required/>
-            </ActionForm>
-            <Table headers={['Projeto','Unidade de distribuição']} rows={(data.routing || []).map(p=>[p.project,data.units?.find(u=>u.id===p.region_id)?.name || 'Unidade do técnico responsável'])}/>
           </Panel>
           {selected && !selected.master && (
             <>
@@ -406,7 +394,7 @@ export default function Master({ db, days, Trend, managing, navigate }) {
                     options={['Ativo', 'Inativo']}
                     defaultValue={selected.active ? 'Ativo' : 'Inativo'}
                   />
-                  <Select label="Unidade de distribuição do técnico" name="stock_unit" placeholder="Sem unidade atribuída" defaultValue={selected.stock_unit || ''} options={(data.units || []).map(u=>[u.id,u.name])}/>
+                  <Select label="Unidade de distribuição do técnico" name="stock_unit" placeholder="Estoque individual do técnico" defaultValue={selected.stock_unit || ''} options={(data.units || []).map(u=>[u.id,u.name])}/>
                   <ServiceAreaFields areas={data.service_areas} person={selected} />
                 </ActionForm>
               </Panel>

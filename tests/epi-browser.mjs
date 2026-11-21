@@ -1,7 +1,7 @@
 import { chromium } from '@playwright/test'
 import assert from 'node:assert/strict'
 import { existsSync } from 'node:fs'
-import { epiFixture, applyDistributionUnits, applySheetDistribution } from './epi-db.mjs'
+import { epiFixture, applyDistributionUnits, applySheetDistribution, applyTechnicianStock } from './epi-db.mjs'
 
 const { pg, owner, tech, employee, call } = await epiFixture()
 const installed = 'C:/Program Files/Google/Chrome/Application/chrome.exe'
@@ -83,6 +83,8 @@ try {
   await pg.query('update public.ssma_profiles set is_master=true where user_id=$1', [owner])
   await applyDistributionUnits(pg)
   await applySheetDistribution(pg)
+  await applyTechnicianStock(pg)
+  await pg.query("update public.ssma_records set details=details||jsonb_build_object('technicianId',$2::text) where id=$1",[employee,tech])
   const admin = await client(owner)
   admin.on('pageerror', (e) => console.error(e.message))
   await admin.goto(base)
@@ -90,11 +92,6 @@ try {
   await admin.locator('[name=password]').fill('local-test')
   await admin.getByRole('button', { name: 'Entrar no sistema' }).click()
   const button = (p, name) => p.getByRole('button', { name, exact: true })
-  await admin.getByRole('navigation',{name:'Administração Master'}).getByRole('button',{name:'Gestão de técnicos'}).click()
-  await admin.getByLabel('Projeto',{exact:true}).filter({visible:true}).first().selectOption('Projeto Norte')
-  await admin.getByLabel('Unidade que atende o projeto').selectOption({label:'MATRIZ'})
-  await button(admin,'Salvar unidade do projeto').click()
-  await admin.getByText('Unidade do projeto atualizada.').waitFor()
   await button(admin, 'Gestão de EPIs').click()
   const link = base + '/emissaoepi'
   await button(admin, 'Estoque').click()
@@ -128,7 +125,11 @@ try {
   await admin.getByLabel('CA', { exact: true }).fill('111')
   await admin.getByLabel('Deseja atualizar a data de validade do CA?').check()
   await admin.getByLabel('Nova validade do CA').fill('2029-03-15')
-  await admin.getByLabel('Valor unitário (R$)', { exact: true }).fill('30')
+  const price = admin.getByLabel('Valor unitário (R$)', { exact:true })
+  await price.pressSequentially('14500')
+  assert.match(await price.inputValue(), /145,00$/)
+  await price.fill('')
+  await price.pressSequentially('3000')
   await admin.getByLabel('Quantidade', { exact: true }).fill('3')
   const startDay = new Intl.DateTimeFormat('en-CA',{timeZone:'America/Sao_Paulo'}).format(new Date())
   const leftGlove = admin.getByLabel('Número da luva esquerda')
@@ -139,9 +140,8 @@ try {
   await admin.getByText(/Vencimento da luva:/).waitFor()
   assert.equal(await admin.getByLabel('Centro de custo do estoque').count(), 0)
   assert.match(await admin.getByLabel('Valor unitário (R$)', { exact: true }).inputValue(), /30,00/)
-  assert.deepEqual((await admin.getByLabel('Unidade de distribuição',{exact:true}).locator('option').allTextContents()).slice(1).sort(),['DF','MATRIZ','RJ'])
+  assert.equal(await admin.getByLabel('Unidade de distribuição',{exact:true}).count(),0)
   await admin.getByLabel('Tamanho / numeração').fill('M')
-  await admin.getByLabel('Unidade de distribuição',{exact:true}).selectOption({ label: 'MATRIZ' })
   await button(admin, 'Salvar material').click()
   await admin.getByRole('cell', { name: 'Luva isolante · Tam. M', exact: true }).waitFor()
   await button(admin, 'Editar Luva isolante · Tam. M').click()
@@ -167,7 +167,6 @@ try {
   await admin.getByLabel('Nome do material').fill('Óculos de teste')
   await admin.getByLabel('Quantidade', {exact:true}).fill('2')
   await admin.getByLabel('Quantidade mínima').fill('50')
-  await admin.getByLabel('Unidade de distribuição',{exact:true}).selectOption({label:'RJ'})
   await button(admin,'Salvar material').click()
   const example = admin.getByRole('row').filter({has:admin.getByRole('cell',{name:'Óculos de teste',exact:true})})
   await example.getByText('Comprar',{exact:true}).waitFor()
@@ -188,6 +187,7 @@ try {
   await portal.getByLabel('Nome do colaborador').selectOption(employee)
   assert.equal(await portal.getByLabel('Estado', { exact: true }).count(),0)
   await portal.getByLabel('Quantidade de Luva isolante · Tam. M').fill('2')
+  assert.equal(await portal.getByText('Unidade de distribuição',{exact:true}).count(),0)
   await button(portal, 'Enviar solicitação').click()
   await portal.getByRole('cell', { name: 'Pedido recebido', exact: true }).waitFor()
   assert.ok(await portal.evaluate(() => document.documentElement.scrollWidth <= innerWidth))

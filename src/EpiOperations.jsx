@@ -69,7 +69,7 @@ export function Requests({ data, profile, save, refresh }) {
               Andamento: <strong>{q.status === 'Solicitado' ? q.stage : q.status}</strong>
               {q.postal && ' · Correios: ' + q.postal}
             </p>
-            {q.status === 'Solicitado' && (profile.is_master || reg?.id === profile.stock_unit) && (
+            {q.status === 'Solicitado' && (profile.is_master || reg?.id === (profile.stock_unit || profile.user_id)) && (
               <ActionForm
                 key={q.stage + '|' + q.postal}
                 submit="Salvar andamento"
@@ -99,7 +99,7 @@ export function Requests({ data, profile, save, refresh }) {
             )}
             {q.status === 'Solicitado' ? (
               <div className="epi-request-actions">
-                {(profile.is_master || reg?.id === profile.stock_unit) && (
+                {(profile.is_master || reg?.id === (profile.stock_unit || profile.user_id)) && (
                   <ActionForm
                     submit="Confirmar entrega"
                     onSave={(p) => save('deliver', { ...p, request_id: q.id })}
