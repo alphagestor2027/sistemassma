@@ -3,7 +3,6 @@ import {
   Boxes,
   ClipboardList,
   Wallet,
-  FileText,
   Truck,
   Archive,
   ExternalLink,
@@ -24,7 +23,6 @@ const tabs = [
   ['Estoque Consolidado', Boxes],
   ['Solicitações', ClipboardList],
   ['Financeiro', Wallet],
-  ['Ficha digital', FileText],
   ['Correios', Truck],
   ['Histórico de movimentações', Archive],
 ]
@@ -33,7 +31,9 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     [data, setData] = useState(null),
     [error, setError] = useState(''),
     [message, setMessage] = useState('')
-  const visible = tabs.filter(([label]) => permitted(profile, 'epi.' + (label==='Estoque Consolidado'?'estoque':epiSections[label])))
+  const [sheetRequest, setSheetRequest] = useState(null)
+  const canSheet = permitted(profile, 'epi.ficha')
+  const visible = tabs.filter(([label]) => (label==='Solicitações' && canSheet) || permitted(profile, 'epi.' + (label==='Estoque Consolidado'?'estoque':epiSections[label])))
   const tab = visible.some(([label]) => label === selected) ? selected : visible[0]?.[0]
   const revision = useRef(0)
   const refresh = useCallback(async () => {
@@ -114,9 +114,9 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
         ) : (
           <>
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
-            {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
+            {tab === 'Solicitações' && permitted(profile,'epi.solicitacoes') && <Requests {...props} onSheet={canSheet ? request=>setSheetRequest({...request}) : null} refresh={refresh} />}{' '}
             {tab === 'Financeiro' && <Finance {...props}><Logistics db={db} profile={profile} onSaved={refresh}/></Finance>}
-            {tab === 'Ficha digital' && <Sheet {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
+            {tab === 'Solicitações' && canSheet && <Sheet sheetRequest={data.requests.find(q=>q.id===sheetRequest?.id && !q.list_removed && q.status!=='Cancelado')} clearRequest={()=>setSheetRequest(null)} {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
             {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}{' '}
           </>
         )}

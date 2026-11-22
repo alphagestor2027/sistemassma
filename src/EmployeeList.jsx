@@ -36,7 +36,7 @@ function employeeEntry(row) {
   return { row, labels, values, searchText }
 }
 
-export function EmployeeList({ db, rows, search, add, edit, remove }) {
+export function EmployeeList({ canViewSheets, db, rows, search, add, edit, remove }) {
   const [selected,setSelected]=useState(null)
   const employee=rows.find(r=>r.id===selected)
   const [selection, setSelection] = useState({})
@@ -99,7 +99,7 @@ export function EmployeeList({ db, rows, search, add, edit, remove }) {
     downloadCsv([heading, ...lines], 'ssma-colaboradores.csv')
   }
   return <>
-    {employee&&<EmployeeHistory key={employee.id} row={employee} db={db} close={()=>setSelected(null)}/>}
+    {employee&&<EmployeeHistory canViewSheets={canViewSheets} key={employee.id} row={employee} db={db} close={()=>setSelected(null)}/>}
     <div className="module-summary">
       <div className="card"><span>Colaboradores cadastrados</span><strong>{rows.length}</strong></div>
       <div className="card"><span>Ativos</span><strong>{rows.filter(row => row.status === 'Ativo').length}</strong></div>

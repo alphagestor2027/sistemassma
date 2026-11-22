@@ -13,7 +13,7 @@ const stages = [
   'Enviado pelos Correios',
 ]
 
-export function Requests({ data, profile, save, refresh, initialFocus }) {
+export function Requests({ data, profile, save, refresh, initialFocus, onSheet }) {
   const [status, setStatus] = useState('')
   const [focused,setFocused]=useState(initialFocus)
   const [action,setAction]=useState('')
@@ -67,6 +67,7 @@ export function Requests({ data, profile, save, refresh, initialFocus }) {
                 {q.status}
               </span>
             </header>
+            {onSheet && !q.employee_removed && q.status!=='Cancelado' && <button className="secondary" onClick={()=>onSheet(q)}>Abrir ficha de EPI</button>}
             <p>{q.items.map((i) => i.qty + ' × ' + variant(i)).join(', ')}</p>
             {q.complete.length>q.items.length&&<details><summary>Ver solicitação completa ({q.complete.length} itens)</summary>
               <p>{q.complete.map(i=>i.qty+' × '+variant(i)).join(', ')}</p></details>}

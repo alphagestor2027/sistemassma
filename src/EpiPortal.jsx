@@ -191,14 +191,13 @@ export default function EpiPortal({ db }) {
                         <div>
                           <strong>{variant(m)}</strong>
                           <small>
-                            {m.ca ? 'CA ' + m.ca : 'Sem CA'} · {m.available} disponíveis
+                            {m.ca ? 'CA ' + m.ca : 'Sem CA'}
                           </small>
                         </div>
                         <input
                           type="number"
                           aria-label={'Quantidade de ' + variant(m)}
                           min="0"
-                          max={m.available}
                           step="1"
                           placeholder="0"
                           disabled={busy || loading}
