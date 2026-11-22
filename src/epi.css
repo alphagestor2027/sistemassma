@@ -51,6 +51,11 @@
 .epi-summary h2 {font-size:18px}
 .epi-summary>div {display:flex;justify-content:space-between;gap:12px;font-size:13px;padding-bottom:10px;border-bottom:1px solid var(--line)}
 .epi-summary>button {width:100%;text-align:left}
+.epi-sheet-overlay {position:fixed;inset:0;z-index:100;background:#101522aa;display:grid;place-items:center;padding:20px}
+.epi-sheet-modal {background:#f3f5f8;border-radius:14px;width:min(1100px,100%);max-height:90vh;overflow:auto;padding:20px;display:grid;gap:18px}
+.epi-sheet-modal>header {display:flex;align-items:center;justify-content:space-between}
+[data-theme="dark"] .epi-sheet-modal {background:#11141a}
+@media print {.epi-sheet-overlay {position:static;display:block;padding:0;background:white}.epi-sheet-modal {width:auto;max-height:none;overflow:visible;background:white}.epi-sheet-modal>header {display:none}}
 @media(max-width:900px){.epi-requests-layout{grid-template-columns:1fr}}
 [data-theme="dark"] .epi-indicator {background:#1c222b;border-color:#3b4452}
 [data-theme="dark"] .epi-indicator>div>span {color:#c6cfdd}

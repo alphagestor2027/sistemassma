@@ -109,9 +109,9 @@ function EmployeeSheets({db,id,request,profile,delivered,onIssued,archiveId,onAr
       </Panel>
       <ReplacementAlert requests={delivered}/>
       {mode!=='view' && <Panel title={mode==='edit'?'Editar ficha nº '+doc.number:'Nova ficha de EPI'}>
-        <form className="fepi-editor" onSubmit={e=>{e.preventDefault();save(request?.status==='Solicitado' && mode==='new')}}>
+        <form className="fepi-editor" onSubmit={e=>{e.preventDefault();save()}}>
           <fieldset disabled={busy}>
-            {(mode==='new' || context.materials) && <SheetMaterials documentOnly={Boolean(request || mode==='edit')} materials={context.materials || []} items={items} setItems={setItems} project={snapshot.unit}/>}
+            {(mode==='new' || context.materials) && <SheetMaterials documentOnly={mode==='edit' || request?.status==='Entregue'} materials={context.materials || []} items={items} setItems={setItems} project={snapshot.unit}/>}
 
             {(request || mode==='edit') && snapshot.items.map(i=><p key={i.key}>{i.qty} × {i.equipment} <button type="button" className="secondary" onClick={()=>setRemoved(prev=>[...prev,i.key])}>Remover item</button></p>)}
             <details><summary>Identificação da empresa e do colaborador</summary><div className="fepi-grid">
@@ -133,7 +133,7 @@ function EmployeeSheets({db,id,request,profile,delivered,onIssued,archiveId,onAr
             </div></details>}
             <Field label="Local de assinatura" value={settings.place} maxLength={200} onChange={e=>field('place',e.target.value)}/>
             <div className="button-group">
-              <button className="primary" disabled={busy || !settings.term.trim() || !settings.legal.trim()}>{mode==='new'?(request?.status==='Solicitado'?'Salvar rascunho':request?'Concluir ficha':'Emitir ficha'):'Salvar alterações da ficha'}</button>
+              <button className="primary" disabled={busy || !settings.term.trim() || !settings.legal.trim()}>{mode==='new'?('Salvar ficha'):'Salvar alterações da ficha'}</button>
               {mode==='edit' && <button className="secondary" type="button" onClick={()=>view(doc)}>Cancelar edição</button>}
             </div>
           </fieldset>
@@ -166,7 +166,7 @@ export function Sheet({ db, data, profile,onIssued,sheetRequest,clearRequest }) 
     return ()=>{current=false;window.removeEventListener('focus',refresh)}
   },[db,attempt,profile.is_master])
   return <>
-    <div ref={section}/><Panel title="Ficha de EPI digital"><p>As fichas são excluídas permanentemente dois anos após a emissão. Salve o PDF em um local seguro. O painel avisa nas últimas 72 horas.</p>{sheetRequest && <p>Ficha da solicitação {sheetRequest.tracking_code} · {sheetRequest.employee} <button className="secondary" onClick={clearRequest}>Nova ficha manual</button></p>}<Field label="Buscar colaborador para a ficha" type="search" value={search} onChange={e=>setSearch(e.target.value)}/><Select label="Consultar colaborador" value={id}
+    <div ref={section}/><Panel title="Selecionar colaborador"><p>As fichas são excluídas permanentemente dois anos após a emissão. Salve o PDF em um local seguro. O painel avisa nas últimas 72 horas.</p>{sheetRequest && <p>Ficha da solicitação {sheetRequest.tracking_code} · {sheetRequest.employee} <button className="secondary" onClick={clearRequest}>Nova ficha manual</button></p>}<Field label="Buscar colaborador para a ficha" type="search" value={search} onChange={e=>setSearch(e.target.value)}/><Select label="Consultar colaborador" value={id}
       options={people.filter(e=>e.id===id || e.name.toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR'))).map(e=>[e.id,e.name])} onChange={e=>{clearRequest();setId(e.target.value);setArchiveId('')}}/>
       {archive.length>0 && <Select label="Fichas emitidas de cadastros removidos" value={archiveId}
         options={archive.map(s=>[s.id,'Nº '+s.number+' · '+stamp(s.issued_at)])}

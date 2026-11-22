@@ -5,7 +5,8 @@ export const deliveryReasons=['Inicial','Substituição por perda ou roubo','Sub
 
 export function SheetMaterials({materials,items,setItems,project,documentOnly}) {
   const [id,setId]=useState(''),[qty,setQty]=useState('1'),[reason,setReason]=useState('')
-  const remaining=materials.filter(m=>!items.some(i=>i.id===m.id))
+  const [search,setSearch]=useState('')
+  const remaining=materials.filter(m=>!items.some(i=>i.id===m.id) && ([m.name,m.ca,...(m.generic_cas||[])].join(' ')).toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR')))
   const selected=remaining.find(m=>m.id===id)
   function include(){
     setItems([...items,{id,qty:Number(qty),reason}])
@@ -13,7 +14,7 @@ export function SheetMaterials({materials,items,setItems,project,documentOnly}) 
   }
   return <section><h3>Materiais para entrega</h3>
     {materials.length>0?<>{documentOnly?<p>As alterações abaixo atualizam os itens do documento.</p>:<p>A emissão confirma a baixa no estoque do SSMA e lança o custo no projeto {project}.</p>}
-      <div className="epi-filters"><Select label="Material de EPI" options={remaining.map(m=>[m.id,m.name+' · '+m.available+' disponíveis'])} value={id} onChange={e=>setId(e.target.value)}/>
+      <div className="epi-filters"><Field label="Buscar material ou CA" type="search" value={search} onChange={e=>{setSearch(e.target.value);setId('')}}/><Select label="Material de EPI" options={remaining.map(m=>[m.id,m.name+' · '+m.available+' disponíveis'])} value={id} onChange={e=>setId(e.target.value)}/>
       <Field label="Quantidade para entrega" type="number" min={1} step={1} max={selected?.available} value={qty} onChange={e=>setQty(e.target.value)}/>
       <Select label="Motivo da entrega" options={deliveryReasons} value={reason} onChange={e=>setReason(e.target.value)}/>
       <button className="secondary" type="button" disabled={!selected || !reason || !Number.isInteger(Number(qty)) || Number(qty)<1 || Number(qty)>selected.available} onClick={include}>Incluir material na ficha</button></div></>:

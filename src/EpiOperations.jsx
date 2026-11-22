@@ -111,14 +111,6 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet }
             )}
             {q.status === 'Solicitado' ? (
               <div className="epi-request-actions">
-                {!q.employee_removed && (profile.is_master || reg?.id === (profile.stock_unit || profile.user_id)) && (
-                  <ActionForm
-                    submit="Confirmar entrega"
-                    onSave={(p) => save('deliver', { ...p, request_id: q.id })}
-                  >
-                    <p>Despesa da entrega: {q.project}</p>
-                  </ActionForm>
-                )}
                 <details>
                   <summary>Cancelar solicitação</summary>
                   <p>A reserva dos materiais será liberada.</p>
