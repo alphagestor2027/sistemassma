@@ -1,6 +1,7 @@
 import React, { useMemo, useState } from 'react'
 import { Download, Plus, Pencil, Trash2 } from 'lucide-react'
 import { dateLabel, downloadCsv } from './data'
+import {EmployeeHistory} from './EmployeeHistory'
 import { regionOf } from './epiData'
 
 const fields = [
@@ -35,7 +36,9 @@ function employeeEntry(row) {
   return { row, labels, values, searchText }
 }
 
-export function EmployeeList({ rows, search, add, edit, remove }) {
+export function EmployeeList({ db, rows, search, add, edit, remove }) {
+  const [selected,setSelected]=useState(null)
+  const employee=rows.find(r=>r.id===selected)
   const [selection, setSelection] = useState({})
   const [status, setStatus] = useState('')
   const [order, setOrder] = useState('asc')
@@ -96,6 +99,7 @@ export function EmployeeList({ rows, search, add, edit, remove }) {
     downloadCsv([heading, ...lines], 'ssma-colaboradores.csv')
   }
   return <>
+    {employee&&<EmployeeHistory key={employee.id} row={employee} db={db} close={()=>setSelected(null)}/>}
     <div className="module-summary">
       <div className="card"><span>Colaboradores cadastrados</span><strong>{rows.length}</strong></div>
       <div className="card"><span>Ativos</span><strong>{rows.filter(row => row.status === 'Ativo').length}</strong></div>
@@ -120,7 +124,7 @@ export function EmployeeList({ rows, search, add, edit, remove }) {
           const uf = employeeState(row)
           const region = regionOf(uf) || row.details?.region
           return <tr key={row.id}>
-            <td><strong>{row.title}</strong><small>{[row.details?.extra, row.details?.registration && 'Matrícula ' + row.details.registration].filter(Boolean).join(' · ')}</small></td>
+            <td><button type="button" className="text-button" onClick={()=>setSelected(row.id)} aria-label={'Ver prontuário de '+row.title}>{row.title}</button><small>{[row.details?.extra, row.details?.registration && 'Matrícula ' + row.details.registration].filter(Boolean).join(' · ')}</small></td>
             <td>{row.unit || '—'}</td>
             <td>{[region, uf].filter(Boolean).join(' / ') || '—'}</td>
             <td>{row.person || 'Sem responsável'}</td>

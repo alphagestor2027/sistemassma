@@ -16,7 +16,6 @@ const contactFields = [
   ['email', 'E-mail'],
   ['company', 'Empresa'],
   ['cnpj', 'CNPJ'],
-  ['sector', 'Setor'],
   ['coordinator', 'Coordenador'],
   ['management', 'Gerência'],
 ]
@@ -113,6 +112,7 @@ function TechnicianSelect({ db, record }) {
 
 export function EmployeeFields({ record, coverage, db, isMaster }) {
   const details = record.details || {}
+  const [dismissed,setDismissed]=useState(record.status==='Inativo')
   const [uf, setUf] = useState(record.employee_state || '')
   const [cpf, setCpf] = useState(formatCpf(details.cpf || ''))
   return (
@@ -129,15 +129,16 @@ export function EmployeeFields({ record, coverage, db, isMaster }) {
             <input type="date" name="admission" defaultValue={details.admission} />
           </label>
           <label className="dismissed">
-            <input type="checkbox" name="dismissed" defaultChecked={record.status === 'Inativo'} />
+            <input type="checkbox" name="dismissed" checked={dismissed} onChange={event=>setDismissed(event.target.checked)} />
             Desligado
           </label>
+          {dismissed&&<p role="status">O cadastro será removido automaticamente dois anos após o registro do desligamento. Salve as informações necessárias nas planilhas oficiais.</p>}
         </div>
         <label>
           Cargo
           <input name="extra" defaultValue={details.extra} maxLength={250} />
         </label>
-        {contactFields.filter(([key]) => key !== 'sector' || record.id).map(([key, label]) => (
+        {contactFields.map(([key, label]) => (
           <label key={key}>
             {label}
             {key === 'cpf' ? (

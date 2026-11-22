@@ -108,7 +108,7 @@ export default function EpiPortal({ db }) {
         </div>
         <div><span>Portal do colaborador</span><Assistant db={db} page="portal"/><ThemeToggle/></div>
       </header>
-      <main>
+      <main><p className="notice">Sistema de apoio não oficial. Por segurança, preencha também as planilhas oficiais.</p>
         <div className="page-heading">
           <div>
             <h1>Solicitação de EPI</h1>
