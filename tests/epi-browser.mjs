@@ -310,6 +310,9 @@ try {
   await sheet.getByText(/Confirmo o recebimento/).waitFor()
   assert.equal(await sheet.locator('svg,canvas').count(),0)
   await admin.emulateMedia({ media: 'print' })
+  for (const selector of ['.epi-indicators', '.epi-summary', '.fepi-editor']) {
+    assert.equal(await admin.locator(selector).first().isVisible(), false, selector)
+  }
   if(process.env.SHEET_QA_PDF) await admin.pdf({path:process.env.SHEET_QA_PDF,preferCSSPageSize:true,printBackground:true,displayHeaderFooter:false})
   assert.ok(await sheet.getByRole('heading',{name:'Fundamentação legal'}).isVisible())
   await admin.emulateMedia({ media: 'screen' })
