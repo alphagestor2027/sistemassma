@@ -151,7 +151,7 @@ export function Requests({ data, profile, save, refresh, initialFocus }) {
   )
 }
 
-export function Finance({ data }) {
+export function Finance({ data, children }) {
   const [project, setProject] = useState(''),
     [center, setCenter] = useState(''),
     [contract, setContract] = useState('')
@@ -200,6 +200,7 @@ export function Finance({ data }) {
           ))}
         </div>
       </Panel>
+      {children}
       <CostBreakdown requests={data.requests.filter(q=>within(q.closed_at,range))}/>
       <Panel title="Despesas por projeto e material">
         <div className="epi-filters">

@@ -115,7 +115,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
           <>
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
             {tab === 'Solicitações' && <Requests {...props} refresh={refresh} />}{' '}
-            {tab === 'Financeiro' && <><Finance {...props} /><Logistics db={db} profile={profile} onSaved={refresh}/></>}
+            {tab === 'Financeiro' && <Finance {...props}><Logistics db={db} profile={profile} onSaved={refresh}/></Finance>}
             {tab === 'Ficha digital' && <Sheet {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
             {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}{' '}
           </>

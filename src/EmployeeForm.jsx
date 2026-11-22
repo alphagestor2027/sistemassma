@@ -137,7 +137,7 @@ export function EmployeeFields({ record, coverage, db, isMaster }) {
           Cargo
           <input name="extra" defaultValue={details.extra} maxLength={250} />
         </label>
-        {contactFields.map(([key, label]) => (
+        {contactFields.filter(([key]) => key !== 'sector' || record.id).map(([key, label]) => (
           <label key={key}>
             {label}
             {key === 'cpf' ? (
