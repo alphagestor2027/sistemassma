@@ -15,11 +15,13 @@ const stages = [
 
 export function Requests({ data, profile, save, refresh, initialFocus, onSheet }) {
   const [status, setStatus] = useState('')
+  const [search, setSearch] = useState('')
   const [focused,setFocused]=useState(initialFocus)
   const [action,setAction]=useState('')
   const activeRequests=data.requests.filter(q=>!q.list_removed)
-  const list = activeRequests.filter(q => (!status || q.status === status)&&(!focused||q.id===focused))
-  const pages=usePages(list.flatMap(q=>q.items.map(item=>({q,item}))),status)
+  const term = search.trim().toLocaleLowerCase('pt-BR')
+  const list = activeRequests.filter(q => (!status || q.status === status)&&(!focused||q.id===focused)&&(!term || [q.employee,q.tracking_code,...q.items.map(variant)].some(value=>String(value||'').toLocaleLowerCase('pt-BR').includes(term))))
+  const pages=usePages(list.flatMap(q=>q.items.map(item=>({q,item}))),status+'|'+search)
   const visible=new Map()
   for(const {q,item} of pages.items){
     if(!visible.has(q.id)) visible.set(q.id,{...q,items:[],complete:q.items})
@@ -40,6 +42,7 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet }
         <button type="button" className="secondary" onClick={()=>setAction('')}>Voltar</button></ActionForm>}
       <div className="epi-filters">
         {focused&&<button className="secondary" onClick={()=>setFocused(null)}>Ver todas as solicitações</button>}
+        <Field label="Buscar solicitação" type="search" placeholder="Colaborador, material ou rastreio" value={search} onChange={e=>setSearch(e.target.value)}/>
         <Select
           label="Situação"
           placeholder="Todas"

@@ -6,6 +6,10 @@ import {
   Truck,
   Archive,
   ExternalLink,
+  FileText,
+  Hourglass,
+  PackageCheck,
+  ClipboardCheck,
 } from 'lucide-react'
 import { Skeleton } from './Skeleton'
 import { Stock } from './EpiStock'
@@ -71,8 +75,17 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     return result
   }
   const props = { data, profile, employees, save, initialFocus:tab===initialTab?initialFocus:null }
+  const requests = data?.requests?.filter(q => !q.list_removed) || []
+  const month = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'}).slice(0,7)
+  const indicators = [
+    ['Solicitações abertas', requests.filter(q=>q.status==='Solicitado').length, FileText],
+    ['Aguardando aprovação', requests.filter(q=>q.status==='Solicitado' && q.stage==='Aguardando aprovação do projeto').length, Hourglass],
+    ['Entregas no mês', requests.filter(q=>q.status==='Entregue' && q.closed_at && new Date(q.closed_at).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}).slice(0,7)===month).length, PackageCheck],
+    ['Solicitações entregues', requests.filter(q=>q.status==='Entregue').length, ClipboardCheck],
+  ]
   return (
     <div className="epi">
+      {data && permitted(profile,'epi.solicitacoes') && <div className="epi-indicators">{indicators.map(([label,value,Icon])=><div className="epi-indicator" key={label}><span className="epi-indicator-icon"><Icon size={24}/></span><div><span>{label}</span><strong>{value}</strong></div></div>)}</div>}
       <div className="epi-bar">
         <nav aria-label="Seções de EPI">
           {visible.map(([name, I]) => (
@@ -91,8 +104,8 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
             </button>
           ))}
         </nav>
-        <a className="secondary" href="/emissaoepi" target="_blank" rel="noreferrer">
-          Solicitar EPI <ExternalLink size={15} />
+        <a className="primary" href="/emissaoepi" target="_blank" rel="noreferrer">
+          Nova solicitação <ExternalLink size={15} />
         </a>
       </div>
       {message && (
@@ -114,7 +127,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
         ) : (
           <>
             {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
-            {tab === 'Solicitações' && permitted(profile,'epi.solicitacoes') && <Requests {...props} onSheet={canSheet ? request=>setSheetRequest({...request}) : null} refresh={refresh} />}{' '}
+            {tab === 'Solicitações' && permitted(profile,'epi.solicitacoes') && <div className="epi-requests-layout"><Requests {...props} onSheet={canSheet ? request=>setSheetRequest({...request}) : null} refresh={refresh} /><aside className="epi-summary card"><h2>Resumo de solicitações</h2>{indicators.map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}{visible.some(([name])=>name==='Estoque') && <button className="secondary" onClick={()=>{setTab('Estoque');onTab?.('Estoque')}}>Consultar estoque →</button>}</aside></div>}{' '}
             {tab === 'Financeiro' && <Finance {...props}><Logistics db={db} profile={profile} onSaved={refresh}/></Finance>}
             {tab === 'Solicitações' && canSheet && <Sheet sheetRequest={data.requests.find(q=>q.id===sheetRequest?.id && !q.list_removed && q.status!=='Cancelado')} clearRequest={()=>setSheetRequest(null)} {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />}{' '}
             {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}{' '}
