@@ -353,7 +353,7 @@ try {
   await button(admin,'Emitir ficha').click()
   await admin.getByLabel('Consultar colaborador').selectOption(employee)
   await admin.getByLabel('Buscar material ou CA').fill('111')
-  await admin.getByLabel('Material de EPI',{exact:true}).selectOption({index:1})
+  await admin.getByText(/Luva isolante.*CA 111.*disponíveis/).waitFor()
   await admin.getByLabel('Motivo da entrega',{exact:true}).selectOption('Inicial')
   await button(admin,'Incluir material na ficha').click()
   await button(admin,'Salvar ficha').click()
