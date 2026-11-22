@@ -35,15 +35,26 @@ export function Consolidated({data,db}) {
     db.rpc('ssma_epi_stock_costs').then(({data,error})=>{if(active){setFailed(Boolean(error));setCosts(data||[])}})
     return ()=>{active=false}
   },[db,retry])
+  const parents=new Map()
+  const normalize=ca=>String(ca||'').trim().replace(/^0+(?=\d)/,'')
+  for(const m of data.materials){for(const generic of m.generic_cas||[]) parents.set(normalize(generic),normalize(m.ca))}
+  const principal=ca=>{let code=normalize(ca);const seen=new Set();while(parents.has(code)&&!seen.has(code)){seen.add(code);code=parents.get(code)}return code}
   const groups=new Map()
   for (const m of data.materials) {
-    const ca=m.no_ca?'':String(m.ca||'').replace(/^0+(?=\d)/,'')
+    const ca=m.no_ca?'':principal(m.ca)
     const key=ca?'ca:'+ca:'nome:'+m.name.trim().toLocaleLowerCase('pt-BR')
-    const g=groups.get(key)||{names:new Set(),ca,qty:0,cents:0}
+    const g=groups.get(key)||{names:new Set(),aliases:new Set(),ca,qty:0,cents:0}
+    for(const alias of m.generic_cas||[])g.aliases.add(alias)
     g.names.add(m.name);g.qty+=m.qty;g.cents+=m.qty*Math.round(Number(m.price)*100);groups.set(key,g)
   }
+  const deliveries=new Map()
+  for(const row of costs||[]){
+    const ca=principal(row.ca),region=regionOf(row.state),key=JSON.stringify([row.project,region,ca||row.material])
+    const group=deliveries.get(key)||{project:row.project,region,ca,names:new Set(),qty:0,cents:0}
+    group.names.add(row.material);group.qty+=Number(row.qty);group.cents+=Math.round(Number(row.cost)*100);deliveries.set(key,group)
+  }
   return <><Panel title="Estoque consolidado por CA">
-    <Table headers={['Material','CA','Quantidade','Valor médio unitário','Valor total em estoque']}
-      rows={[...groups.values()].map(g=>[[...g.names].join(' / '),g.ca||'Sem CA',g.qty,g.qty?money(g.cents/g.qty/100):'—',money(g.cents/100)])}/>
-  </Panel><Panel title="Distribuição por projeto e região">{failed?<button className="secondary" onClick={()=>setRetry(n=>n+1)}>Falha ao consultar. Tentar novamente</button>:costs===null?<p>Carregando distribuição…</p>:<Table headers={['Projeto','Região','Material','CA','Quantidade entregue','Valor entregue']} rows={costs.map(r=>[r.project,regionOf(r.state),r.material,r.ca||'Sem CA',r.qty,money(r.cost)])}/>}</Panel></>
+    <Table headers={['Material','CA principal','CAs genéricos','Quantidade','Valor médio unitário','Valor total em estoque']}
+      rows={[...groups.values()].map(g=>[[...g.names].join(' / '),g.ca||'Sem CA',[...g.aliases].join(', ')||'—',g.qty,g.qty?money(g.cents/g.qty/100):'—',money(g.cents/100)])}/>
+  </Panel><Panel title="Distribuição por projeto e região">{failed?<button className="secondary" onClick={()=>setRetry(n=>n+1)}>Falha ao consultar. Tentar novamente</button>:costs===null?<p>Carregando distribuição…</p>:<Table headers={['Projeto','Região','Material','CA','Quantidade entregue','Valor entregue']} rows={[...deliveries.values()].map(r=>[r.project,r.region,[...r.names].join(' / '),r.ca||'Sem CA',r.qty,money(r.cents/100)])}/>}</Panel></>
 }

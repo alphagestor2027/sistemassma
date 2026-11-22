@@ -35,7 +35,7 @@ test('vínculo automático, área autorizada e validade da luva na entrega', asy
     assert.deepEqual(await report(),[])
     await manage('deliver',{request_id:request})
     assert.deepEqual(await report(),[{employee:'Ana Técnica',state:'DF',material:'Luva isolante',qty:3,due,rejected:false}])
-    await pg.query('update ssma_epi.materials set glove_start=current_date where id=$1',[material])
+    await pg.query("update ssma_epi.materials set glove_start=(now() at time zone 'America/Sao_Paulo')::date where id=$1",[material])
     assert.equal((await report())[0].due,due)
     const asset = await manage('asset',{request_id:request,material_id:material,serial:'L-01',days:365,due})
     assert.ok(asset.ok)

@@ -71,11 +71,16 @@ export function Stock({ db, data, profile, save, initialFocus }) {
     m.id,
     variant(m) + ' · ' + regionLabel(data.regions.find((r) => r.id === m.region_id)),
   ])
+  const [order,setOrder]=useState('Relevância')
+  const norm=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()
+  const term=norm(search)
+  const score=m=>[m.ca,...(m.generic_cas||[]),m.name].some(v=>norm(v)===term)?0:norm(m.name).startsWith(term)?1:2
   const materials = scopedMaterials.filter(
     (m) =>
-      [variant(m), m.ca].join(' ').toLowerCase().includes(search.toLowerCase()),
+      norm([variant(m),m.ca,...(m.generic_cas||[])].join(' ')).includes(term),
   )
-  const pages=usePages(materials,search+unit)
+  materials.sort((a,b)=>(order==='Quantidade crescente'?available(a)-available(b):order==='Relevância'&&term?score(a)-score(b):0)||variant(a).localeCompare(variant(b),'pt-BR',{numeric:true}))
+  const pages=usePages(materials,search+unit+order)
   return (
     <>
       <Panel
@@ -143,6 +148,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
               save(editing ? 'edit_material' : 'material', {
                 ...p,
                 ...(editing && {material_id:editing.id, revision:editing.revision, qty:p.qty || 0, minimum:p.minimum || 0, price:p.price || 0}),
+                generic_cas: noCA ? [] : [p.generic1,p.generic2,p.generic3].filter(Boolean),
                 insulating_glove: glove,
                 glove_start: glove ? start : null,
                 no_ca: noCA,
@@ -164,7 +170,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
               maxLength={200}
             />
             <Field
-              label="CA"
+              label="CA principal"
               name="ca"
               value={noCA ? '' : ca}
               onChange={(e) => changeCa(e.target.value)}
@@ -177,6 +183,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
               <input type="checkbox" checked={noCA} onChange={(e) => setNoCA(e.target.checked)} />
               Material sem CA
             </label>
+            {!noCA && [1,2,3].map(n=><Field key={n} label={'CA genérico '+n} name={'generic'+n} inputMode="numeric" pattern="[0-9]+" maxLength={70} defaultValue={editing?.generic_cas?.[n-1]||''}/>)}
             {!noCA && <CaResult result={lookup} index={fichaIndex} onSelect={setFicha} />}
             <PriceField label="Valor unitário (R$)" initialValue={editing?.price} />
             <Field label="Quantidade" name="qty" {...numberProps} min={editing?.reserved || 0} defaultValue={editing?.qty} />
@@ -242,6 +249,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
           </ActionForm>
         )}
         <div className="epi-filters">
+          <Select label="Ordenar materiais" value={order} onChange={e=>setOrder(e.target.value||'Relevância')} options={['Relevância','Ordem alfabética','Quantidade crescente']}/>
           {profile.is_master&&<Select label="Filtrar material por unidade" placeholder="Todas as unidades" value={unit} onChange={e=>setUnit(e.target.value)} options={units}/>}
           <Field
             label="Buscar material ou CA"
