@@ -5,11 +5,11 @@ import {
   Wallet,
   Truck,
   Archive,
-  ExternalLink,
   FileText,
   Hourglass,
   PackageCheck,
   ClipboardCheck,
+  X,
 } from 'lucide-react'
 import { Skeleton } from './Skeleton'
 import { Stock } from './EpiStock'
@@ -85,54 +85,67 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     ['Solicitações entregues', requests.filter(q=>q.status==='Entregue').length, ClipboardCheck],
   ]
   return (
-    <div className="epi">
-      {data && permitted(profile,'epi.solicitacoes') && <div className="epi-indicators">{indicators.map(([label,value,Icon])=><div className="epi-indicator" key={label}><span className="epi-indicator-icon"><Icon size={24}/></span><div><span>{label}</span><strong>{value}</strong></div></div>)}</div>}
-      <div className="epi-bar">
-        <nav aria-label="Seções de EPI">
-          {visible.map(([name, I]) => (
-            <button
-              key={name}
-              className={tab === name ? 'selected' : ''}
-              aria-current={tab === name ? 'page' : undefined}
-              onClick={() => {
-                setTab(name)
-                onTab?.(name)
-                setMessage('')
-              }}
-            >
-              <I size={16} />
-              {name}
-            </button>
-          ))}
-        </nav>
-        {canSheet && <button className="primary" onClick={()=>{setSheetRequest(null);setSheetOpen(true)}}>Emitir ficha</button>}
-      </div>
-      {message && (
-        <p role="status" className="epi-success">
-          {message}
-        </p>
-      )}
-      {error && (
-        <div className="notice error" role="alert">
-          {error}
-          <button onClick={refresh}>Tentar novamente</button>
+    <div className={'epi' + (sheetOpen && canSheet ? ' epi-side-open' : '')}>
+      <div className="epi-main">
+        {data && permitted(profile,'epi.solicitacoes') && <div className="epi-indicators">{indicators.map(([label,value,Icon])=><div className="epi-indicator" key={label}><span className="epi-indicator-icon"><Icon size={22}/></span><div><span>{label}</span><strong>{value}</strong></div></div>)}</div>}
+        <div className="epi-bar">
+          <nav aria-label="Seções de EPI">
+            {visible.map(([name, I]) => (
+              <button
+                key={name}
+                className={tab === name ? 'selected' : ''}
+                aria-current={tab === name ? 'page' : undefined}
+                onClick={() => {
+                  setTab(name)
+                  onTab?.(name)
+                  setMessage('')
+                }}
+              >
+                <I size={15} />
+                {name}
+              </button>
+            ))}
+          </nav>
+          {canSheet && <button className="primary" onClick={()=>{setSheetRequest(null);setSheetOpen(true)}}><FileText size={16}/>Emitir ficha</button>}
         </div>
-      )}
-      <div className="epi-tab-content" key={tab}>
-        {tab === 'Histórico de movimentações' ? (
-          <StockHistory db={db} profile={profile}/>
-        ) : tab==='Correios' ? <Logistics db={db} profile={profile} shipping/> : !data || !profile ? (
-          !error && <Skeleton label="Carregando o módulo de EPI…"/>
-        ) : (
-          <>
-            {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
-            {tab === 'Solicitações' && permitted(profile,'epi.solicitacoes') && <div className="epi-requests-layout"><Requests {...props} onSheet={canSheet ? request=>{setSheetRequest({...request});setSheetOpen(true)} : null} refresh={refresh} /><aside className="epi-summary card"><h2>Resumo de solicitações</h2>{indicators.map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}{visible.some(([name])=>name==='Estoque') && <button className="secondary" onClick={()=>{setTab('Estoque');onTab?.('Estoque')}}>Consultar estoque →</button>}</aside></div>}{' '}
-            {tab === 'Financeiro' && <Finance {...props}><Logistics db={db} profile={profile} onSaved={refresh}/></Finance>}
-            {canSheet && sheetOpen && <div className="epi-sheet-overlay" role="presentation"><div className="epi-sheet-modal" role="dialog" aria-modal="true" aria-label="Emitir ficha de EPI"><header><h2>Ficha de EPI</h2><button className="secondary" onClick={()=>setSheetOpen(false)}>Fechar</button></header><Sheet sheetRequest={data.requests.find(q=>q.id===sheetRequest?.id && !q.list_removed && q.status!=='Cancelado')} clearRequest={()=>setSheetRequest(null)} {...props} db={db} onIssued={() => {refresh(); onChange?.()}} /></div></div>}{' '}
-            {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}{' '}
-          </>
+        {message && (
+          <p role="status" className="epi-success">
+            {message}
+          </p>
         )}
+        {error && (
+          <div className="notice error" role="alert">
+            {error}
+            <button onClick={refresh}>Tentar novamente</button>
+          </div>
+        )}
+        <div className="epi-tab-content" key={tab}>
+          {tab === 'Histórico de movimentações' ? (
+            <StockHistory db={db} profile={profile}/>
+          ) : tab==='Correios' ? <Logistics db={db} profile={profile} shipping/> : !data || !profile ? (
+            !error && <Skeleton label="Carregando o módulo de EPI…"/>
+          ) : (
+            <>
+              {tab === 'Estoque' && <Stock {...props} db={db} />}{' '}
+              {tab === 'Solicitações' && permitted(profile,'epi.solicitacoes') && <div className="epi-requests-layout"><Requests {...props} onSheet={canSheet ? request=>{setSheetRequest({...request});setSheetOpen(true)} : null} refresh={refresh} /><aside className="epi-summary card"><h2>Resumo de solicitações</h2>{indicators.map(([label,value])=><div key={label}><span>{label}</span><strong>{value}</strong></div>)}{visible.some(([name])=>name==='Estoque') && <button className="secondary" onClick={()=>{setTab('Estoque');onTab?.('Estoque')}}>Consultar estoque →</button>}</aside></div>}{' '}
+              {tab === 'Financeiro' && <Finance {...props}><Logistics db={db} profile={profile} onSaved={refresh}/></Finance>}
+              {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}{' '}
+            </>
+          )}
+        </div>
       </div>
+      {/* Side panel for EPI sheet */}
+      {canSheet && sheetOpen && (
+        <aside className="epi-side-panel" role="complementary" aria-label="Ficha de EPI">
+          <header className="epi-side-header">
+            <h2>Ficha de EPI</h2>
+            <button className="epi-side-close" onClick={()=>setSheetOpen(false)} aria-label="Fechar painel"><X size={20}/></button>
+          </header>
+          <div className="epi-side-body">
+            <Sheet sheetRequest={data?.requests?.find(q=>q.id===sheetRequest?.id && !q.list_removed && q.status!=='Cancelado')} clearRequest={()=>setSheetRequest(null)} {...props} db={db} onIssued={() => {refresh(); onChange?.()}} />
+          </div>
+        </aside>
+      )}
     </div>
   )
 }

@@ -5,6 +5,7 @@ import { ReplacementAlert } from './EpiIndicators'
 import { defaultSettings, identityFields, SheetDocument } from './EpiSheetDocument'
 import { SheetMaterials,deliveryReasons } from './SheetMaterials'
 import { stamp } from './epiData'
+import { Search, UserCheck } from 'lucide-react'
 
 async function squareLogo(file) {
   if (!['image/png','image/jpeg','image/webp'].includes(file.type)) throw Error('Escolha uma imagem PNG, JPEG ou WebP.')
@@ -177,8 +178,10 @@ export function Sheet({ db, data, profile,onIssued,sheetRequest,clearRequest }) 
   const [people,setPeople]=useState([]), [error,setError]=useState(''), [attempt,retry]=useState(0)
   const [archive,setArchive]=useState([]), [archiveId,setArchiveId]=useState('')
   const [search,setSearch]=useState('')
-  const section=useRef(null)
-  useEffect(()=>{if(sheetRequest){setId(sheetRequest.employee_id);setArchiveId('');setSearch('');section.current?.scrollIntoView({block:'start'})}},[sheetRequest?.id])
+  const [showSuggestions,setShowSuggestions]=useState(false)
+  const inputRef=useRef(null)
+  const listRef=useRef(null)
+  useEffect(()=>{if(sheetRequest){setId(sheetRequest.employee_id);setArchiveId('');setSearch('')}},[sheetRequest?.id])
   const archivedSheet=archive.find(s=>s.id===archiveId)
   useEffect(()=>{
     let current=true
@@ -193,12 +196,80 @@ export function Sheet({ db, data, profile,onIssued,sheetRequest,clearRequest }) 
     }).catch(e=>{if(current)setError(e.message)})
     return ()=>{current=false;window.removeEventListener('focus',refresh)}
   },[db,attempt,profile.is_master])
+
+  const norm=v=>v.normalize('NFD').replace(/\p{M}/gu,'').toLocaleLowerCase('pt-BR').trim()
+  const term=norm(search)
+  const filtered=term?people.filter(e=>norm(e.name).includes(term)):people
+  const selectedPerson=people.find(e=>e.id===id)
+
+  function selectPerson(person){
+    clearRequest()
+    setId(person.id)
+    setSearch(person.name)
+    setShowSuggestions(false)
+    setArchiveId('')
+  }
+
+  // Close dropdown when clicking outside
+  useEffect(()=>{
+    function handleClick(e){
+      if(inputRef.current&&!inputRef.current.contains(e.target)&&listRef.current&&!listRef.current.contains(e.target)){
+        setShowSuggestions(false)
+      }
+    }
+    document.addEventListener('mousedown',handleClick)
+    return ()=>document.removeEventListener('mousedown',handleClick)
+  },[])
+
   return <>
-    <div ref={section}/><Panel title="Selecionar colaborador"><p>As fichas são excluídas permanentemente dois anos após a emissão. Salve o PDF em um local seguro. O painel avisa nas últimas 72 horas.</p>{sheetRequest && <p>Ficha da solicitação {sheetRequest.tracking_code} · {sheetRequest.employee} <button className="secondary" onClick={clearRequest}>Nova ficha manual</button></p>}<Field label="Buscar colaborador para a ficha" type="search" value={search} onChange={e=>setSearch(e.target.value)}/><Select label="Consultar colaborador" value={id}
-      options={people.filter(e=>e.id===id || e.name.toLocaleLowerCase('pt-BR').includes(search.trim().toLocaleLowerCase('pt-BR'))).map(e=>[e.id,e.name])} onChange={e=>{clearRequest();setId(e.target.value);setArchiveId('')}}/>
-      {archive.length>0 && <Select label="Fichas emitidas de cadastros removidos" value={archiveId}
-        options={archive.map(s=>[s.id,'Nº '+s.number+' · '+stamp(s.issued_at)])}
-        onChange={e=>{clearRequest();setArchiveId(e.target.value);setId('')}}/>}</Panel>
+    {/* Autocomplete collaborator search */}
+    <div className="epi-autocomplete-wrap">
+      {sheetRequest && <div className="epi-autocomplete-request">
+        <p>Ficha da solicitação <strong>{sheetRequest.tracking_code}</strong> · {sheetRequest.employee}</p>
+        <button className="secondary" onClick={clearRequest}>Nova ficha manual</button>
+      </div>}
+      <p className="epi-autocomplete-hint">As fichas são excluídas permanentemente dois anos após a emissão. Salve o PDF em um local seguro.</p>
+      <div className="epi-autocomplete">
+        <div className="epi-autocomplete-input" ref={inputRef}>
+          <Search size={16} className="epi-autocomplete-icon"/>
+          <input
+            type="text"
+            placeholder="Digite o nome do colaborador…"
+            value={search}
+            onChange={e=>{setSearch(e.target.value);setShowSuggestions(true);if(!e.target.value.trim()){setId('');setArchiveId('')}}}
+            onFocus={()=>setShowSuggestions(true)}
+            autoComplete="off"
+          />
+        </div>
+        {showSuggestions && search.trim() && filtered.length>0 && (
+          <ul className="epi-autocomplete-list" ref={listRef} role="listbox">
+            {filtered.slice(0,8).map(person=>(
+              <li key={person.id} role="option" aria-selected={person.id===id}
+                className={person.id===id?'selected':''}
+                onClick={()=>selectPerson(person)}>
+                <UserCheck size={16}/>
+                <span>{person.name}</span>
+              </li>
+            ))}
+            {filtered.length>8 && <li className="epi-autocomplete-more">+{filtered.length-8} resultados — refine a busca</li>}
+          </ul>
+        )}
+        {showSuggestions && search.trim() && !filtered.length && (
+          <div className="epi-autocomplete-empty">Nenhum colaborador encontrado.</div>
+        )}
+      </div>
+      {selectedPerson && <div className="epi-selected-person">
+        <UserCheck size={18}/>
+        <div>
+          <strong>{selectedPerson.name}</strong>
+          <small>Colaborador selecionado</small>
+        </div>
+      </div>}
+    </div>
+
+    {archive.length>0 && <Select label="Fichas emitidas de cadastros removidos" value={archiveId}
+      options={archive.map(s=>[s.id,'Nº '+s.number+' · '+stamp(s.issued_at)])}
+      onChange={e=>{clearRequest();setArchiveId(e.target.value);setId('')}}/>}
     {error && <p className="notice error" role="alert">{error} <button onClick={()=>retry(attempt+1)}>Tentar novamente</button></p>}
     {id && <EmployeeSheets key={id+(sheetRequest?.id || '')} request={sheetRequest} db={db} id={id} profile={profile} onIssued={onIssued}
       delivered={data.requests.filter(q=>q.employee_id===id && q.status==='Entregue')}/>}
