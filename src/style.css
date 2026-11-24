@@ -27,3 +27,74 @@ dialog:has(.employee-form){width:760px}
 .employee-filters .text-button{margin-top:12px}
 .technician-gloves{padding:20px;margin:0 0 20px;min-width:0}
 .technician-gloves .card-heading{margin-bottom:12px}
+
+/* ─── Search Results Filters & View Details ─── */
+.search-filter-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin: 14px 0 16px;
+  flex-wrap: wrap;
+}
+.search-filter-pills .pill-btn {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 13px;
+  font-weight: 600;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.12);
+  color: #9ba3b2;
+  transition: all 150ms ease;
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.search-filter-pills .pill-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+}
+.search-filter-pills .pill-btn.active {
+  background: rgba(191, 38, 60, 0.2);
+  border-color: rgba(191, 38, 60, 0.5);
+  color: #ff7a8a;
+}
+:root:not([data-theme="dark"]) .search-filter-pills .pill-btn {
+  background: #fff;
+  border-color: #dfe2e8;
+  color: #555e6c;
+}
+:root:not([data-theme="dark"]) .search-filter-pills .pill-btn:hover {
+  background: #f7f8fa;
+  color: #1d232d;
+}
+:root:not([data-theme="dark"]) .search-filter-pills .pill-btn.active {
+  background: #f8e5e8;
+  border-color: #d11f35;
+  color: #9f192e;
+}
+.view-record-details {
+  padding: 8px 0;
+}
+.record-view-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
+  gap: 16px;
+  margin: 16px 0 24px;
+}
+.record-view-grid dt {
+  font-size: 11px;
+  color: var(--muted);
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+  margin-bottom: 4px;
+}
+.record-view-grid dd {
+  margin: 0;
+  font-weight: 600;
+  font-size: 14px;
+}
+.icon-button.danger:hover {
+  color: #dc3545;
+  background: rgba(220, 53, 69, 0.15);
+}
+
