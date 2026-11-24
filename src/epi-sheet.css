@@ -1,5 +1,5 @@
-.fepi-document{max-width:210mm;margin:16px auto;color:#171717;font-family:Arial,sans-serif}
-.fepi-page{border:1px solid #ddd;border-bottom:3px solid #b61e31;background:#fff;padding:8mm;min-height:235mm;margin:0 0 18px;box-sizing:border-box;overflow-wrap:anywhere}
+.fepi-document{width:100%;max-width:210mm;margin:0 auto;color:#171717;font-family:Arial,sans-serif;box-sizing:border-box}
+.fepi-page{border:1px solid #ddd;border-bottom:3px solid #b61e31;background:#fff;padding:8mm;min-height:235mm;margin:0 0 18px;box-sizing:border-box;overflow-wrap:anywhere;box-shadow:0 4px 16px rgba(0,0,0,0.25)}
 .fepi-mast{display:flex;align-items:center;gap:15px;padding:12px 0;border-top:5px solid #b61e31;border-bottom:2px solid #161616}
 .fepi-mast img,.fepi-logo-preview img{width:60px;height:60px;object-fit:contain}
 .fepi-mast>div{flex:1;min-width:0}.fepi-mast b{display:block;text-transform:uppercase;font-size:17px;line-height:1.25}
@@ -23,7 +23,6 @@
 @page fepi{size:A4 portrait;margin:12mm 12mm 15mm;@bottom-right{content:counter(page) " / " counter(pages);font:9pt Arial;color:#444}}
 @media print{
  html:has(.fepi-document),body:has(.fepi-document){page:fepi;background:white!important}
- /* Keep only the document and its ancestor chain in the print layout. */
  :is(body,body *):has(.fepi-document) > :not(.fepi-document):not(:has(.fepi-document)){display:none!important}
  body:has(.fepi-document) :is(.epi-sheet-overlay,.epi-sheet-modal){display:block!important;position:static!important;width:auto;max-height:none;overflow:visible;margin:0;padding:0;background:white!important;box-shadow:none}
  body:has(.fepi-document) .shell{display:block!important;background:white!important}
