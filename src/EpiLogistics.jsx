@@ -44,15 +44,25 @@ function InvoiceForm({db,materials,save,unit,editing}) {
 function ShippingForm({employees,profile,unit,save,editing}) {
   const [employee,setEmployee]=useState(employees.some(e=>e.id===editing?.employee_id)?editing.employee_id:'')
   const selected=employees.find(e=>e.id===employee)
+  const costOptions = selected
+    ? [
+        [selected.project, 'Projeto do colaborador (' + selected.project + ')'],
+        ['Setor Facilities', 'Setor Facilities'],
+        ['SSMA', 'SSMA'],
+      ]
+    : [
+        ['SSMA', 'SSMA'],
+        ['Setor Facilities', 'Setor Facilities'],
+      ]
   return <ActionForm submit={editing?'Salvar alterações do envio':'Registrar envio'} onSave={p=>save({...p,unit_id:unit})}>
     <Field label="Data de envio" type="date" name="date" required defaultValue={editing?.sent||today()}/>
     <Field label="Código de rastreamento" name="tracking" defaultValue={editing?.tracking} required minLength={4} maxLength={64}/>
     <Select label="Modalidade de entrega" name="mode" defaultValue={editing?.mode} required options={['PAC','SEDEX','SEDEX 10','SEDEX 12','SEDEX Hoje','Mini Envios','Carta registrada','Outra']}/>
     <Select label="Colaborador cadastrado" name="employee_id" placeholder="Outro destinatário ou empresa" options={employees.map(e=>[e.id,e.name+' · '+e.project])} value={employee} onChange={e=>setEmployee(e.target.value)}/>
-    {selected?<p>{selected.project} · {regionOf(selected.state)} · {selected.state}</p>:<>
+    {selected?<p>{regionOf(selected.state)} · {selected.state}</p>:<>
       <Field label="Nome do destinatário ou empresa" name="recipient" defaultValue={editing?.recipient} required maxLength={200}/>
-      <Field label="Projeto" name="project" defaultValue={editing?.project} required maxLength={120}/>
       <Select label="UF de destino" name="state" defaultValue={editing?.state} required options={profile.is_master?states:profile.coverage||[]}/></>}
+    <Select label="Custo de envio atribuído a" name="project" key={employee||'no-emp'} defaultValue={editing?.project || (selected ? selected.project : 'SSMA')} required options={costOptions}/>
     <PriceField label="Valor do envio" initialValue={editing?.cost} required/>
   </ActionForm>
 }

@@ -72,15 +72,40 @@ export function Stock({ db, data, profile, save, initialFocus }) {
     variant(m) + ' · ' + regionLabel(data.regions.find((r) => r.id === m.region_id)),
   ])
   const [order,setOrder]=useState('Relevância')
+  const [replenishment,setReplenishment]=useState('Todas')
   const norm=value=>String(value||'').normalize('NFD').replace(/[\u0300-\u036f]/g,'').trim().toLowerCase()
   const term=norm(search)
   const score=m=>[m.ca,...(m.generic_cas||[]),m.name].some(v=>norm(v)===term)?0:norm(m.name).startsWith(term)?1:2
+  const replenishmentStatus = m => {
+    const avail = available(m)
+    const min = m.minimum || 0
+    if (avail < min) return 'Comprar'
+    const limit = min > 0 ? min * 1.5 : 10
+    if (avail > limit) return 'Acima'
+    return 'Ideal'
+  }
   const materials = scopedMaterials.filter(
-    (m) =>
-      norm([variant(m),m.ca,...(m.generic_cas||[])].join(' ')).includes(term),
+    (m) => {
+      const rep = replenishmentStatus(m)
+      if (replenishment === 'Comprar' && rep !== 'Comprar') return false
+      if (replenishment === 'Não comprar' && rep === 'Comprar') return false
+      if (replenishment === 'Ideal' && rep !== 'Ideal') return false
+      if (replenishment === 'Acima' && rep !== 'Acima') return false
+      return norm([variant(m),m.ca,...(m.generic_cas||[])].join(' ')).includes(term)
+    }
   )
-  materials.sort((a,b)=>(order==='Quantidade crescente'?available(a)-available(b):order==='Relevância'&&term?score(a)-score(b):0)||variant(a).localeCompare(variant(b),'pt-BR',{numeric:true}))
-  const pages=usePages(materials,search+unit+order)
+  const totalVal = m => available(m) * Number(m.price || 0)
+  materials.sort((a,b)=>{
+    if(order==='Quantidade crescente') return available(a)-available(b)
+    if(order==='Quantidade decrescente') return available(b)-available(a)
+    if(order==='Menor valor unitário') return Number(a.price||0)-Number(b.price||0)
+    if(order==='Maior valor unitário') return Number(b.price||0)-Number(a.price||0)
+    if(order==='Menor valor total') return totalVal(a)-totalVal(b)
+    if(order==='Maior valor total') return totalVal(b)-totalVal(a)
+    if(order==='Relevância'&&term) return score(a)-score(b)
+    return variant(a).localeCompare(variant(b),'pt-BR',{numeric:true})
+  })
+  const pages=usePages(materials,search+unit+order+replenishment)
   return (
     <>
       <Panel
@@ -249,7 +274,8 @@ export function Stock({ db, data, profile, save, initialFocus }) {
           </ActionForm>
         )}
         <div className="epi-filters">
-          <Select label="Ordenar materiais" value={order} onChange={e=>setOrder(e.target.value||'Relevância')} options={['Relevância','Ordem alfabética','Quantidade crescente']}/>
+          <Select label="Filtrar por reposição" value={replenishment} onChange={e=>setReplenishment(e.target.value)} options={[['Todas','Todas as reposições'],'Comprar','Não comprar','Ideal','Acima']}/>
+          <Select label="Ordenar materiais" value={order} onChange={e=>setOrder(e.target.value||'Relevância')} options={['Relevância','Ordem alfabética','Quantidade crescente','Quantidade decrescente','Menor valor unitário','Maior valor unitário','Menor valor total','Maior valor total']}/>
           {profile.is_master&&<Select label="Filtrar material por unidade" placeholder="Todas as unidades" value={unit} onChange={e=>setUnit(e.target.value)} options={units}/>}
           <Field
             label="Buscar material ou CA"
@@ -294,7 +320,7 @@ export function Stock({ db, data, profile, save, initialFocus }) {
 
             available(m),
             m.minimum,
-            <span className={'badge ' + (available(m) < m.minimum ? 'red' : 'green')}>{available(m) < m.minimum ? 'Comprar' : 'Ideal'}</span>,
+            <span className={'badge ' + (replenishmentStatus(m) === 'Comprar' ? 'red' : replenishmentStatus(m) === 'Acima' ? 'blue' : 'green')}>{replenishmentStatus(m)}</span>,
             money(m.price),
             <div>
               {m.insulating_glove && (

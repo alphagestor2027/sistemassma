@@ -26,7 +26,7 @@ export function StockHistory({db,profile}) {
     setClearError('')
     try {
       const result=await rpc(db,'manage',{action:'clear_history',p:{}})
-      setFeedback(result.count ? `Limpeza concluída. Lançamentos removidos dos relatórios: ${result.count}.` : 'O histórico já está limpo.')
+      setFeedback(result.count ? `Limpeza concluída. Movimentações removidas do histórico: ${result.count}.` : 'O histórico já está limpo.')
       setConfirming(false)
       setResult(null)
       reload(n=>n+1)
@@ -38,10 +38,10 @@ export function StockHistory({db,profile}) {
   }
   return <Panel title="Histórico de entradas e saídas" action={<div className="button-group">
     <button className="secondary" onClick={()=>reload(n=>n+1)}>Atualizar histórico</button>
-    {showCost && !confirming && <button className="secondary" onClick={()=>{setConfirming(true);setFeedback('');setClearError('')}}>Limpar todo o histórico</button>}
+    {permitted(profile,'epi.historico') && !confirming && <button className="secondary" onClick={()=>{setConfirming(true);setFeedback('');setClearError('')}}>Limpar todo o histórico</button>}
   </div>}>
     {confirming && <div className="notice">
-      <p>Limpar os lançamentos de todos os períodos {profile.is_master?'de todas as unidades':'no seu escopo de atendimento'}? A limpeza também retira esses valores do Financeiro. O saldo físico e as fichas de entrega serão preservados.</p>
+      <p>Limpar os lançamentos de todos os períodos {profile.is_master?'de todas as unidades':'no seu escopo de atendimento'}? A aba financeira, o saldo físico e as fichas de entrega serão preservados.</p>
       <div className="button-group"><button className="secondary" disabled={clearing} onClick={()=>{setConfirming(false);setClearError('')}}>Cancelar</button>
         <button className="primary" disabled={clearing} onClick={clearHistory}>{clearing?'Limpando…':'Confirmar limpeza'}</button></div>
       {clearError && <p role="alert">{clearError}</p>}

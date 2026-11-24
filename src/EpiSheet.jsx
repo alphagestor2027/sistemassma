@@ -82,6 +82,31 @@ function EmployeeSheets({db,id,request,profile,delivered,onIssued,archiveId,onAr
   const field = (key,value) => setSettings(current => ({...current,[key]:value}))
   const baseSnapshot = doc?.snapshot || context?.snapshot
   const snapshot = baseSnapshot && {...baseSnapshot,items:baseSnapshot.items.filter(i=>!removed.includes(i.key))}
+  const liveItems = (mode === 'new' && !request)
+    ? items.map((it, idx) => {
+        const mat = (context?.materials || []).find(m => m.id === it.id)
+        return {
+          key: 'draft-' + (it.id || idx),
+          date: new Date().toISOString().slice(0, 10),
+          ca: mat?.ca || '',
+          equipment: mat?.name || 'Material',
+          qty: it.qty,
+          reason: it.reason
+        }
+      })
+    : (snapshot?.items || [])
+  const effectiveSnapshot = snapshot && {
+    ...snapshot,
+    items: liveItems
+  }
+  const effectiveReasons = {
+    ...(settings?.reasons || {}),
+    ...(mode === 'new' && !request ? Object.fromEntries(liveItems.map(i => [i.key, i.reason])) : {})
+  }
+  const effectiveSettings = settings && {
+    ...settings,
+    reasons: effectiveReasons
+  }
   return <>
     {message && <p className="epi-success" role="status">{message}</p>}
     {error && <div role="alert" className="notice error">{error} <button className="secondary" disabled={busy} onClick={()=>setReload(n=>n+1)}>Recarregar fichas</button></div>}
@@ -102,13 +127,16 @@ function EmployeeSheets({db,id,request,profile,delivered,onIssued,archiveId,onAr
           </>}
         </div>
         {doc?.expires_at && <p>Exclusão programada para {stamp(doc.expires_at)}.</p>}
-        {confirm && <div className="notice"><p>Excluir a ficha nº {doc.number}? As entregas continuarão no histórico do colaborador.</p>
+        {confirm && <div className="notice"><p>Excluir a ficha nº {doc.number}? Os materiais selecionados voltarão para o estoque e os lançamentos financeiros serão estornados.</p>
           <button className="secondary" disabled={busy} onClick={()=>setConfirm(false)}>Cancelar</button>{' '}
-          <button className="primary" disabled={busy} onClick={()=>run(async()=>{await api('delete',{id:doc.id,revision:doc.revision});if(archiveId) onArchiveDeleted(); else setReload(n=>n+1)})}>Confirmar exclusão</button>
+          <button className="primary" disabled={busy} onClick={()=>run(async()=>{await api('delete',{id:doc.id,revision:doc.revision});onIssued?.();if(archiveId) onArchiveDeleted(); else setReload(n=>n+1)})}>Confirmar exclusão</button>
         </div>}
       </Panel>
       <ReplacementAlert requests={delivered}/>
-      {mode!=='view' && <Panel title={mode==='edit'?'Editar ficha nº '+doc.number:'Nova ficha de EPI'}>
+      {mode!=='view' && <Panel title={<div style={{display:'flex',alignItems:'center',gap:'0.75rem',flexWrap:'wrap'}}>
+          <span>{mode==='edit'?'Editar ficha nº '+doc.number:'Nova ficha de EPI'}</span>
+          {mode==='new' && <span className="badge blue">Modo Rascunho</span>}
+        </div>}>
         <form className="fepi-editor" onSubmit={e=>{e.preventDefault();save()}}>
           <fieldset disabled={busy}>
             {(mode==='new' || context.materials) && <SheetMaterials documentOnly={mode==='edit' || request?.status==='Entregue'} materials={context.materials || []} items={items} setItems={setItems} project={snapshot.unit}/>}
@@ -139,7 +167,7 @@ function EmployeeSheets({db,id,request,profile,delivered,onIssued,archiveId,onAr
           </fieldset>
         </form>
       </Panel>}
-      <SheetDocument snapshot={snapshot} settings={settings} number={doc?.number} issuedAt={doc?.issued_at}/>
+      <SheetDocument snapshot={effectiveSnapshot} settings={effectiveSettings} number={doc?.number} issuedAt={doc?.issued_at}/>
     </>}
   </>
 }

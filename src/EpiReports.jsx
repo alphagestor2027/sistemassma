@@ -20,7 +20,7 @@ export function totalsBy(rows,key,cents) {
   return [...totals].sort((a,b)=>b[1]-a[1]).map(([name,v])=>[name,money(v/100)])
 }
 export function CostBreakdown({requests}) {
-  const rows=requests.filter(q=>q.status==='Entregue'&&!q.finance_cleared&&q.destination==='Projeto')
+  const rows=requests.filter(q=>q.status==='Entregue'&&q.destination==='Projeto')
   const cents=q=>q.items.reduce((v,i)=>v+i.qty*Math.round(Number(i.price)*100),0)
   return <Panel title="Valor entregue por projeto e região">
     <div className="epi-split"><Table headers={['Projeto','Valor total']} rows={totalsBy(rows,q=>q.project,cents)}/>

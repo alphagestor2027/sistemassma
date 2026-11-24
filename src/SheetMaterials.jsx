@@ -24,7 +24,7 @@ export function SheetMaterials({materials,items,setItems,project,documentOnly}) 
     setSearch('');setId('');setQty('1');setReason('')
   }
   return <section><h3>Materiais para entrega</h3>
-    {materials.length>0?<>{documentOnly?<p>As alterações abaixo atualizam os itens do documento.</p>:<p>A emissão confirma a baixa no estoque do SSMA e lança o custo no projeto {project}.</p>}
+    {materials.length>0?<>{documentOnly?<p>As alterações abaixo atualizam os itens do documento.</p>:<p>Modo Rascunho: A seleção não subtrai o estoque agora. A baixa no estoque do SSMA e o lançamento do custo no projeto {project} ocorrem somente ao salvar a ficha.</p>}
       <Field label="Buscar material ou CA" type="search" value={search} onChange={e=>{setSearch(e.target.value);setId('')}}/>
       {term && <div aria-live="polite">
         {selected && <p>{materialLabel(selected)}</p>}

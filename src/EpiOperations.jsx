@@ -153,7 +153,7 @@ export function Finance({ data, children }) {
     [contract, setContract] = useState('')
   const [range,setRange]=useState({start:'',end:''})
   const movements=data.movements.filter(m=>within(m.created_at,range))
-  const groups = expenseGroups(data.requests.filter(request => !request.finance_cleared && within(request.closed_at,range)))
+  const groups = expenseGroups(data.requests.filter(request => within(request.closed_at,range)))
   const sum = (list, fn) => list.reduce((s, x) => s + fn(x), 0)
   const movementValue = (kind) =>
     sum(
