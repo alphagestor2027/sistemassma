@@ -1,5 +1,6 @@
 import {CaResult,useCaLookup} from './CaCatalog'
 import React,{useEffect,useState} from 'react'
+import { Truck, CirclePlus, Coins, Package, FileText, Pencil, Trash2 } from 'lucide-react'
 import {ActionForm,Field,Panel,Select,Table,rpc} from './EpiShared'
 import {DateRange,within,totalsBy} from './EpiReports'
 import {PriceField} from './PriceField'
@@ -90,25 +91,70 @@ export function Logistics({db,profile,shipping=false,onSaved}) {
       setConfirm(null);setNotice(shipping?'Envio excluído.':'Nota excluída e estoque atualizado.');setRevision(n=>n+1);onSaved?.()
     }catch(err){setMutationError(err.message)}finally{setRemoving(false)}
   }
-  function actions(row){return <div className="button-group">
-    <button className="secondary" disabled={removing} onClick={()=>{setEditing(row);setForm(true);setConfirm(null);setNotice('');setMutationError('')}}>Editar</button>
-    <button className="secondary" disabled={removing} onClick={()=>{setConfirm(row);setForm(false);setEditing(null);setNotice('');setMutationError('')}}>Excluir</button></div>}
+  function actions(row){return <div className="table-icon-actions">
+    <button className="icon-action" title="Editar" aria-label="Editar" disabled={removing} onClick={()=>{setEditing(row);setForm(true);setConfirm(null);setNotice('');setMutationError('')}}><Pencil size={15} aria-hidden="true"/></button>
+    <button className="icon-action danger" title="Excluir" aria-label="Excluir" disabled={removing} onClick={()=>{setConfirm(row);setForm(false);setEditing(null);setNotice('');setMutationError('')}}><Trash2 size={15} aria-hidden="true"/></button></div>}
   if(error) return <p role="alert">{error} <button className="secondary" onClick={()=>setRevision(n=>n+1)}>Tentar novamente</button></p>
   if(!data) return <Skeleton label="Carregando lançamentos…"/>
   const rows=data.rows.filter(r=>within(shipping?r.sent:r.issued,range))
-  return <Panel title={shipping?'Envios pelos Correios':'Notas fiscais de entrada'} action={<button className="primary" onClick={()=>{setEditing(null);setConfirm(null);setForm(!form);setNotice('');setMutationError('')}}>{form?'Fechar cadastro':shipping?'Cadastrar envio':'Inserir nota fiscal'}</button>}>
-    {notice&&<p role="status">{notice}</p>}
+  const totalShipping=rows.reduce((v,s)=>v+Math.round(s.cost*100),0)/100
+  return <Panel
+    title={shipping?'Envios pelos Correios':'Notas fiscais de entrada'}
+    icon={shipping?<Truck size={21} aria-hidden="true"/>:undefined}
+    className={shipping?'epi-shipping-panel':(form?'epi-invoice-panel expanded':'epi-invoice-panel')}
+    action={
+      <button className="primary btn-compact" onClick={()=>{setEditing(null);setConfirm(null);setForm(!form);setNotice('');setMutationError('')}}>
+        <CirclePlus size={16} aria-hidden="true"/> {form?'Fechar cadastro':shipping?'Cadastrar envio':'Inserir nota fiscal'}
+      </button>
+    }
+  >
+    {notice&&<p className="epi-success" role="status">{notice}</p>}
     {mutationError&&<p role="alert" className="form-error">{mutationError}</p>}
     {confirm&&<div className="notice"><p>{shipping?'Excluir o envio '+confirm.tracking+' e descontar seu frete dos totais?':'Excluir a nota '+confirm.number+' e descontar seus itens do estoque?'}</p>
-      <button className="secondary" disabled={removing} onClick={()=>setConfirm(null)}>Cancelar</button>
-      <button className="primary" disabled={removing} onClick={remove}>Confirmar exclusão</button></div>}
+      <div className="button-group"><button className="secondary" disabled={removing} onClick={()=>setConfirm(null)}>Cancelar</button>
+      <button className="primary" disabled={removing} onClick={remove}>Confirmar exclusão</button></div></div>}
     {form&&<>{profile.is_master&&!editing&&<Select label="Estoque do lançamento" value={unit} onChange={e=>setChoice(e.target.value)} options={data.units.map(u=>[u.id,u.name])}/>}
       {unit&&(shipping?<ShippingForm key={editing?.id||unit} editing={editing} employees={data.employees.filter(e=>e.unit===unit)} profile={profile} unit={unit} save={save}/>:<InvoiceForm db={db} key={editing?.id||unit} editing={editing} unit={unit} materials={data.materials.filter(m=>m.region_id===unit)} save={save}/>)}</>}
-    <DateRange value={range} onChange={setRange}/>
-    {shipping?<><h3>Gasto com envios · {money(rows.reduce((v,s)=>v+Math.round(s.cost*100),0)/100)}</h3><div className="epi-split">
-      <Table headers={['Região','Gasto com envios']} rows={totalsBy(rows,s=>regionOf(s.state),s=>Math.round(s.cost*100))}/>
-      <Table headers={['Projeto','Gasto com envios']} rows={totalsBy(rows,s=>s.project,s=>Math.round(s.cost*100))}/></div>
-      <Table headers={['Data','Rastreio','Destinatário','Projeto','UF','Modalidade','Valor','Ações']} rows={rows.map(s=>[dateLabel(s.sent),s.tracking,s.recipient,s.project,s.state,s.mode,money(s.cost),actions(s)])}/></>:
-      <Table headers={['Emissão','Nota fiscal','Série','CNPJ','Itens','Valor total','Ações']} rows={rows.map(n=>[dateLabel(n.issued),n.number,n.series||'—',n.cnpj,n.items.length,money(n.total),actions(n)])}/>}
+    {shipping?(
+      <>
+        <div className="epi-shipping-bar">
+          <DateRange value={range} onChange={setRange}/>
+          <div className="epi-shipping-total">
+            <span className="epi-shipping-total-icon"><Coins size={20} aria-hidden="true"/></span>
+            <div>
+              <small>Gasto com envios</small>
+              <strong>{money(totalShipping)}</strong>
+            </div>
+          </div>
+        </div>
+        {rows.length>0?(
+          <>
+            <div className="epi-split">
+              <Table headers={['Região','Gasto com envios']} rows={totalsBy(rows,s=>regionOf(s.state),s=>Math.round(s.cost*100))}/>
+              <Table headers={['Projeto','Gasto com envios']} rows={totalsBy(rows,s=>s.project,s=>Math.round(s.cost*100))}/>
+            </div>
+            <Table headers={['Data','Rastreio','Destinatário','Projeto','UF','Modalidade','Valor','Ações']} rows={rows.map(s=>[dateLabel(s.sent),<strong className="material-strong">{s.tracking}</strong>,s.recipient,s.project,<span className="uf-pill">{s.state}</span>,s.mode,<strong className="money-strong">{money(s.cost)}</strong>,actions(s)])}/>
+          </>
+        ):(
+          <div className="epi-empty-hero">
+            <span className="epi-empty-circle"><Package size={30} aria-hidden="true"/></span>
+            <h3>Nenhum envio encontrado</h3>
+            <p>Ajuste o período ou cadastre um envio para começar.</p>
+          </div>
+        )}
+      </>
+    ):(
+      <>
+        <DateRange value={range} onChange={setRange}/>
+        {rows.length>0?(
+          <Table headers={['Emissão','Nota fiscal','Série','CNPJ','Itens','Valor total','Ações']} rows={rows.map(n=>[dateLabel(n.issued),<strong className="material-strong">{n.number}</strong>,n.series||'—',n.cnpj,n.items.length,<strong className="money-strong">{money(n.total)}</strong>,actions(n)])}/>
+        ):(
+          <div className="epi-empty-invoice">
+            <FileText size={36} aria-hidden="true"/>
+            <p>Nenhuma nota fiscal no período</p>
+          </div>
+        )}
+      </>
+    )}
   </Panel>
 }

@@ -1,6 +1,7 @@
 import {usePages} from './Pagination'
 import {PriceField} from './PriceField'
 import React, { useState } from 'react'
+import { ShieldCheck, Plus, CirclePlus, Search, ShoppingCart, CircleCheck, TrendingUp, Pencil, Trash2 } from 'lucide-react'
 import { CaExpiryEditor, CaResult, useCaLookup } from './CaCatalog'
 import { Panel, ActionForm, Field, Select, Table, rpc } from './EpiShared'
 import { available, variant, regionLabel, money, after365 } from './epiData'
@@ -113,13 +114,13 @@ export function Stock({ db, data, profile, save, initialFocus }) {
         action={
           <div className="button-group">
             <button className="secondary" onClick={() => open('lookup')}>
-              Consultar CA
+              <ShieldCheck size={16} aria-hidden="true" /> Consultar CA
             </button>
             <button className="secondary" onClick={() => open('entry')}>
-              Registrar entrada
+              <Plus size={16} aria-hidden="true" /> Registrar entrada
             </button>
             <button className="primary" onClick={() => open('new')}>
-              Cadastrar material
+              <CirclePlus size={16} aria-hidden="true" /> Cadastrar material
             </button>
           </div>
         }
@@ -273,13 +274,15 @@ export function Stock({ db, data, profile, save, initialFocus }) {
             <PriceField label="Valor unitário da entrada (R$)" placeholder="Usar o custo atual" />
           </ActionForm>
         )}
-        <div className="epi-filters">
+        <div className="epi-filters epi-stock-filters">
           <Select label="Filtrar por reposição" value={replenishment} onChange={e=>setReplenishment(e.target.value)} options={[['Todas','Todas as reposições'],'Comprar','Não comprar','Ideal','Acima']}/>
           <Select label="Ordenar materiais" value={order} onChange={e=>setOrder(e.target.value||'Relevância')} options={['Relevância','Ordem alfabética','Quantidade crescente','Quantidade decrescente','Menor valor unitário','Maior valor unitário','Menor valor total','Maior valor total']}/>
           {profile.is_master&&<Select label="Filtrar material por unidade" placeholder="Todas as unidades" value={unit} onChange={e=>setUnit(e.target.value)} options={units}/>}
           <Field
             label="Buscar material ou CA"
             type="search"
+            icon={<Search size={15} aria-hidden="true" />}
+            placeholder="Buscar..."
             value={search}
             onChange={(e) => {
               setSearch(e.target.value)
@@ -313,36 +316,46 @@ export function Stock({ db, data, profile, save, initialFocus }) {
             'Validade',
             'Ações',
           ]}
-          rows={pages.items.map((m) => [
-            variant(m),
-            m.no_ca ? <span className="badge red">Sem CA</span> : m.ca,
-            regionLabel(data.regions.find(r=>r.id===m.region_id)),
+          rows={pages.items.map((m) => {
+            const rep = replenishmentStatus(m)
+            return [
+              <strong className="material-strong">{variant(m)}</strong>,
+              m.no_ca ? <span className="badge red">Sem CA</span> : m.ca,
+              regionLabel(data.regions.find(r=>r.id===m.region_id)),
 
-            available(m),
-            m.minimum,
-            <span className={'badge ' + (replenishmentStatus(m) === 'Comprar' ? 'red' : replenishmentStatus(m) === 'Acima' ? 'blue' : 'green')}>{replenishmentStatus(m)}</span>,
-            money(m.price),
-            <div>
-              {m.insulating_glove && (
-                <details>
-                  <summary>{m.glove_start ? 'Atualizar ensaio' : 'Informar início'}</summary>
-                  <ActionForm
-                    submit="Salvar data"
-                    onSave={(p) => save('glove_date', { ...p, material_id: m.id, previous: m.glove_start })}
-                  >
-                    <Field label="Data do certificado ou ensaio" name="glove_start" type="date" required />
-                  </ActionForm>
-                </details>
-              )}
-              {m.ca_expiry && <div>CA · {m.ca_expiry}</div>}
-              {m.expiry && <div className={m.expiry < today() ? 'red-text' : ''}>{m.insulating_glove ? 'Ensaio' : 'Lote'} · {dateLabel(m.expiry)}</div>}
-              {!m.ca_expiry && !m.expiry && '—'}
-            </div>,
-            <div className="button-group">
-              <button className="secondary" aria-label={'Editar ' + variant(m)} onClick={() => selectMaterial(m,'edit')}>Editar</button>
-              <button className="secondary" aria-label={'Excluir ' + variant(m)} onClick={() => selectMaterial(m,'delete')}>Excluir</button>
-            </div>,
-          ])}
+              available(m),
+              m.minimum,
+              <span className={'badge badge-icon ' + (rep === 'Comprar' ? 'red' : rep === 'Acima' ? 'blue' : 'green')}>
+                {rep === 'Comprar' ? <ShoppingCart size={13} aria-hidden="true" /> : rep === 'Acima' ? <TrendingUp size={13} aria-hidden="true" /> : <CircleCheck size={13} aria-hidden="true" />}
+                <span>{rep}</span>
+              </span>,
+              money(m.price),
+              <div>
+                {m.insulating_glove && (
+                  <details>
+                    <summary>{m.glove_start ? 'Atualizar ensaio' : 'Informar início'}</summary>
+                    <ActionForm
+                      submit="Salvar data"
+                      onSave={(p) => save('glove_date', { ...p, material_id: m.id, previous: m.glove_start })}
+                    >
+                      <Field label="Data do certificado ou ensaio" name="glove_start" type="date" required />
+                    </ActionForm>
+                  </details>
+                )}
+                {m.ca_expiry && <div><span className={!m.expiry && !m.insulating_glove ? 'sr-only' : ''}>CA · </span>{m.ca_expiry}</div>}
+                {m.expiry && <div className={m.expiry < today() ? 'red-text' : ''}>{m.insulating_glove ? 'Ensaio' : 'Lote'} · {dateLabel(m.expiry)}</div>}
+                {!m.ca_expiry && !m.expiry && '—'}
+              </div>,
+              <div className="table-icon-actions">
+                <button className="icon-action" title="Editar" aria-label={'Editar ' + variant(m)} onClick={() => selectMaterial(m,'edit')}>
+                  <Pencil size={15} aria-hidden="true" />
+                </button>
+                <button className="icon-action danger" title="Excluir" aria-label={'Excluir ' + variant(m)} onClick={() => selectMaterial(m,'delete')}>
+                  <Trash2 size={15} aria-hidden="true" />
+                </button>
+              </div>,
+            ]
+          })}
           empty="Nenhum material encontrado neste estoque."
         />
         {pages.controls}

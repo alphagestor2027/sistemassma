@@ -1,16 +1,25 @@
 import React, { useRef, useState } from 'react'
 
-export function Field({ label, children, ...props }) {
+export function Field({ label, icon, className = '', children, ...props }) {
   return (
-    <label className="epi-field">
+    <label className={'epi-field' + (className ? ' ' + className : '')}>
       <span>{label}</span>
-      {children || <input {...props} />}
+      {children || (
+        icon ? (
+          <span className="epi-input-wrap">
+            {icon}
+            <input {...props} />
+          </span>
+        ) : (
+          <input {...props} />
+        )
+      )}
     </label>
   )
 }
-export function Select({ label, options, placeholder = 'Selecione', ...props }) {
+export function Select({ label, options, placeholder = 'Selecione', className = '', ...props }) {
   return (
-    <Field label={label}>
+    <Field label={label} className={className}>
       <select aria-label={label} {...props}>
         <option value="">{placeholder}</option>
         {options.map((o) => {
@@ -25,11 +34,14 @@ export function Select({ label, options, placeholder = 'Selecione', ...props }) 
     </Field>
   )
 }
-export function Panel({ title, action, children }) {
+export function Panel({ title, icon, action, className = '', children }) {
   return (
-    <section className="card epi-panel">
+    <section className={'card epi-panel' + (className ? ' ' + className : '')}>
       <header>
-        <h2>{title}</h2>
+        <h2 className={icon ? 'epi-panel-title-icon' : undefined}>
+          {icon}
+          <span>{title}</span>
+        </h2>
         {action}
       </header>
       {children}

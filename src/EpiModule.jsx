@@ -1,4 +1,5 @@
 import React, { useCallback, useEffect, useRef, useState } from 'react'
+import { createPortal } from 'react-dom'
 import {
   Boxes,
   ClipboardList,
@@ -7,7 +8,7 @@ import {
   Archive,
   FileText,
   Hourglass,
-  PackageCheck,
+  Package,
   ClipboardCheck,
   X,
 } from 'lucide-react'
@@ -76,22 +77,32 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     )
     return result
   }
+  const [headingHost, setHeadingHost] = useState(null)
+  useEffect(() => {
+    setHeadingHost(document.getElementById('epi-heading-action'))
+  }, [])
   const props = { data, profile, employees, save, initialFocus:tab===initialTab?initialFocus:null }
   const requests = data?.requests?.filter(q => !q.list_removed) || []
   const month = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'}).slice(0,7)
   const indicators = [
-    ['Solicitações abertas', requests.filter(q=>q.status==='Solicitado').length, FileText],
-    ['Aguardando aprovação', requests.filter(q=>q.status==='Solicitado' && q.stage==='Aguardando aprovação do projeto').length, Hourglass],
-    ['Entregas no mês', requests.filter(q=>q.status==='Entregue' && q.closed_at && new Date(q.closed_at).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}).slice(0,7)===month).length, PackageCheck],
-    ['Solicitações entregues', requests.filter(q=>q.status==='Entregue').length, ClipboardCheck],
+    ['Solicitações abertas', requests.filter(q=>q.status==='Solicitado').length, FileText, 'red'],
+    ['Aguardando aprovação', requests.filter(q=>q.status==='Solicitado' && q.stage==='Aguardando aprovação do projeto').length, Hourglass, 'amber'],
+    ['Entregas no mês', requests.filter(q=>q.status==='Entregue' && q.closed_at && new Date(q.closed_at).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}).slice(0,7)===month).length, Package, 'green'],
+    ['Solicitações entregues', requests.filter(q=>q.status==='Entregue').length, ClipboardCheck, 'blue'],
   ]
+  const emitBtn = canSheet && (
+    <button className="primary epi-emit-btn" onClick={()=>{setSheetRequest(null);setSheetOpen(true)}}>
+      <FileText size={16} aria-hidden="true"/> Emitir ficha
+    </button>
+  )
   return (
     <div className="epi">
+      {headingHost && emitBtn && createPortal(emitBtn, headingHost)}
       {data && permitted(profile,'epi.solicitacoes') && (
         <div className="epi-indicators">
-          {indicators.map(([label,value,Icon])=>(
-            <div className="epi-indicator" key={label}>
-              <span className="epi-indicator-icon"><Icon size={22}/></span>
+          {indicators.map(([label,value,Icon,tone])=>(
+            <div className={'epi-indicator tone-' + tone} key={label}>
+              <span className="epi-indicator-icon"><Icon size={22} aria-hidden="true"/></span>
               <div><span>{label}</span><strong>{value}</strong></div>
             </div>
           ))}
@@ -110,16 +121,12 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
                 setMessage('')
               }}
             >
-              <I size={15} />
+              <I size={15} aria-hidden="true" />
               {name}
             </button>
           ))}
         </nav>
-        {canSheet && (
-          <button className="primary" onClick={()=>{setSheetRequest(null);setSheetOpen(true)}}>
-            <FileText size={16}/> Emitir ficha
-          </button>
-        )}
+        {!headingHost && emitBtn}
       </div>
       {message && (
         <p role="status" className="epi-success">
@@ -151,11 +158,17 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
                 />
                 <aside className="epi-summary card">
                   <h2>Resumo de solicitações</h2>
-                  {indicators.map(([label,value])=>(
-                    <div key={label}><span>{label}</span><strong>{value}</strong></div>
-                  ))}
+                  <div className="epi-summary-list">
+                    {indicators.map(([label,value,Icon,tone])=>(
+                      <div className="epi-summary-item" key={label}>
+                        <span className={'epi-summary-icon tone-' + tone}><Icon size={16} aria-hidden="true"/></span>
+                        <span className="epi-summary-label">{label}</span>
+                        <strong>{value}</strong>
+                      </div>
+                    ))}
+                  </div>
                   {visible.some(([name])=>name==='Estoque') && (
-                    <button className="secondary" onClick={()=>{setTab('Estoque');onTab?.('Estoque')}}>
+                    <button className="epi-summary-cta" onClick={()=>{setTab('Estoque');onTab?.('Estoque')}}>
                       Consultar estoque →
                     </button>
                   )}

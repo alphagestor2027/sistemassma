@@ -98,3 +98,41 @@ dialog:has(.employee-form){width:760px}
   background: rgba(220, 53, 69, 0.15);
 }
 
+.sr-only {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
+}
+.official-banner {
+  border-radius: 10px;
+  border-color: #e4e8ef;
+  color: #475569;
+  font-size: 13px;
+  padding: 12px 16px;
+}
+.official-banner svg {
+  color: #64748b;
+  flex-shrink: 0;
+}
+.eyebrow.module-eyebrow {
+  font-size: 13px;
+  font-weight: 500;
+  letter-spacing: 0;
+  color: #64748b;
+  margin-bottom: 6px;
+}
+.epi-heading-slot:empty {
+  display: none;
+}
+@media print {
+  .epi-heading-slot {
+    display: none !important;
+  }
+}
+

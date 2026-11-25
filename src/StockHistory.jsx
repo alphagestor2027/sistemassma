@@ -1,5 +1,6 @@
 import { Skeleton } from './Skeleton'
 import React, {useEffect, useState} from 'react'
+import { RefreshCw, Trash2, TriangleAlert } from 'lucide-react'
 import {Panel, Field, Table, rpc} from './EpiShared'
 import {today} from './data'
 import {stamp, money, variant} from './epiData'
@@ -37,8 +38,8 @@ export function StockHistory({db,profile}) {
     }
   }
   return <Panel title="Histórico de entradas e saídas" action={<div className="button-group">
-    <button className="secondary" onClick={()=>reload(n=>n+1)}>Atualizar histórico</button>
-    {permitted(profile,'epi.historico') && !confirming && <button className="secondary" onClick={()=>{setConfirming(true);setFeedback('');setClearError('')}}>Limpar todo o histórico</button>}
+    <button className="secondary" onClick={()=>reload(n=>n+1)}><RefreshCw size={15} aria-hidden="true"/> Atualizar histórico</button>
+    {permitted(profile,'epi.historico') && !confirming && <button className="btn-outline-danger" onClick={()=>{setConfirming(true);setFeedback('');setClearError('')}}><Trash2 size={15} aria-hidden="true"/> Limpar todo o histórico</button>}
   </div>}>
     {confirming && <div className="notice">
       <p>Limpar os lançamentos de todos os períodos {profile.is_master?'de todas as unidades':'no seu escopo de atendimento'}? A aba financeira, o saldo físico e as fichas de entrega serão preservados.</p>
@@ -47,16 +48,24 @@ export function StockHistory({db,profile}) {
       {clearError && <p role="alert">{clearError}</p>}
     </div>}
     {feedback && <p className="epi-success" role="status">{feedback}</p>}
-    <div className="epi-filters">
-      <Field label="Período"><select value={period} onChange={e=>{if(e.target.value==='custom')setCustom({start,end});setPeriod(e.target.value)}}>
+    <div className="epi-filters epi-history-filters">
+      <Field label="Período" className="epi-period-field"><select value={period} onChange={e=>{if(e.target.value==='custom')setCustom({start,end});setPeriod(e.target.value)}}>
         {[7,30,90,365].map(d=><option key={d} value={d}>Últimos {d} dias</option>)}<option value="custom">Personalizado</option>
       </select></Field>
       {period==='custom' && <><Field label="Data inicial" type="date" value={start} max={end} onChange={e=>setCustom({...custom,start:e.target.value})}/>
         <Field label="Data final" type="date" value={end} min={start} onChange={e=>setCustom({...custom,end:e.target.value})}/></>}
     </div>
-    {!valid?<p role="alert">Informe um intervalo de datas válido.</p>:error?<p role="alert">{error}</p>:rows===null?<Skeleton label="Carregando movimentações…"/>:
+    {!valid?<p role="alert">Informe um intervalo de datas válido.</p>:error?(
+      <div className="epi-warning-box" role="alert">
+        <span className="epi-warning-icon"><TriangleAlert size={22} aria-hidden="true"/></span>
+        <div>
+          <strong>Não foi possível carregar o histórico</strong>
+          <p>{error === 'Failed to fetch' ? 'Tente atualizar para consultar as movimentações.' : error}</p>
+        </div>
+      </div>
+    ):rows===null?<Skeleton label="Carregando movimentações…"/>:
       <Table headers={['Data','Movimentação','Material','Quantidade','Unidade','Colaborador','Projeto',...(showCost?['Valor total']:[])]}
-        rows={rows.map(v=>[stamp(v.created_at),v.kind,variant(v.material_label || {}),v.qty,v.unit,v.employee,v.project,...(showCost?[money(v.total)]:[])])}
+        rows={rows.map(v=>[stamp(v.created_at),<span className={'badge '+(v.kind==='Entrada'?'green':'gray')}>{v.kind}</span>,<strong className="material-strong">{variant(v.material_label || {})}</strong>,v.qty,v.unit,v.employee||'—',v.project||'—',...(showCost?[<strong className="money-strong">{money(v.total)}</strong>]:[])])}
         empty="Nenhuma movimentação no período selecionado."/>}
   </Panel>
 }
