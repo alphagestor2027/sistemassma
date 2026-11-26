@@ -1,8 +1,9 @@
 import {Integrations} from './Assistant'
 import { GloveIndicators } from './EpiIndicators'
+import StockIndicators from './StockIndicators'
 import { Skeleton } from './Skeleton'
 import React, { useEffect, useState } from 'react'
-import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2 } from 'lucide-react'
+import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2, ChartNoAxesCombined } from 'lucide-react'
 import { modules, groups } from './config'
 import { epiSections } from './access'
 import { recentPeriod, matchesLocation } from './reportFilters'
@@ -134,7 +135,7 @@ function Permissions({ person, db, reload }) {
     </form>
   )
 }
-export default function Master({ db, days, Trend, managing, navigate }) {
+export default function Master({ db, days, Trend, managing, navigate, employees = [] }) {
   const [data, setData] = useState(null),
     [tech, setTech] = useState(''),
     [uf, setUf] = useState(''),
@@ -147,7 +148,8 @@ export default function Master({ db, days, Trend, managing, navigate }) {
     [changingAccess, setChangingAccess] = useState(false),
     [error, setError] = useState('')
   const [integrations,setIntegrations]=useState(false)
-  useEffect(()=>{setIntegrations(false)},[managing])
+  const [stockTab,setStockTab]=useState(false)
+  useEffect(()=>{setIntegrations(false);setStockTab(false)},[managing])
   async function reload() {
     const { data, error } = await db.rpc('ssma_master', { action: 'overview', p: {} })
     if (error) {
@@ -243,16 +245,20 @@ export default function Master({ db, days, Trend, managing, navigate }) {
   return (
     <div className="epi">
       <nav className="button-group" aria-label="Administração Master">
-        <button className={managing||integrations ? 'secondary' : 'primary'} onClick={() => {setIntegrations(false);navigate('master')}}>
+        <button className={managing||integrations||stockTab ? 'secondary' : 'primary'} onClick={() => {setIntegrations(false);setStockTab(false);navigate('master')}}>
           Visão geral
         </button>
-        <button className={managing&&!integrations ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);navigate('technicians')}}>
+        <button className={stockTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);if(managing)navigate('master');setStockTab(true)}}>
+          <ChartNoAxesCombined size={16} aria-hidden="true" />
+          Indicadores de Estoque
+        </button>
+        <button className={managing&&!integrations&&!stockTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);setStockTab(false);navigate('technicians')}}>
           <Users size={16} />
           Gestão de técnicos
         </button>
-        <button className={integrations?'primary':'secondary'} onClick={()=>setIntegrations(true)}>Integrações de IA</button>
+        <button className={integrations?'primary':'secondary'} onClick={()=>{setStockTab(false);setIntegrations(true)}}>Integrações de IA</button>
       </nav>
-      {integrations?<Integrations db={db}/>:managing ? (
+      {integrations?<Integrations db={db}/>:stockTab?<StockIndicators db={db} profile={{is_master:true,active:true}} employees={employees} initialDays={days}/>:managing ? (
         <>
           <Panel
             title="Técnicos de segurança"

@@ -23,6 +23,7 @@ import {
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
 import { money, variant, expenseGroups, stamp, nextStatus } from './epiData'
 import { today, dateLabel } from './data'
+import './stock-indicators.css'
 
 const stages = [
   'Pedido recebido',
@@ -65,6 +66,20 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet }
   const [search, setSearch] = useState('')
   const [focused,setFocused]=useState(initialFocus)
   const [action,setAction]=useState('')
+  const [signingId,setSigningId]=useState(null)
+  const [signError,setSignError]=useState('')
+  async function toggleSigned(q){
+    if(signingId)return
+    setSigningId(q.id)
+    setSignError('')
+    try{
+      await save('toggle_signed',{request_id:q.id,signed:!q.sheet_signed})
+    }catch(e){
+      setSignError(e.message||'Não foi possível atualizar a assinatura da ficha.')
+    }finally{
+      setSigningId(null)
+    }
+  }
   const activeRequests=data.requests.filter(q=>!q.list_removed)
   const term = search.trim().toLocaleLowerCase('pt-BR')
   const list = activeRequests.filter(q => (!status || q.status === status)&&(!focused||q.id===focused)&&(!term || [q.employee,q.tracking_code,...q.items.map(variant)].some(value=>String(value||'').toLocaleLowerCase('pt-BR').includes(term))))
@@ -112,6 +127,7 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet }
           options={['Solicitado', 'Entregue', 'Cancelado']}
         />
       </div>
+      {signError && <p role="alert" className="form-error">{signError}</p>}
       <div className="epi-request-list">
         {[...visible.values()].map((q) => {
           const reg = data.regions.find((r) => r.id === q.region_id)
@@ -130,14 +146,33 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet }
                     </small>
                   </div>
                 </div>
-                <span
-                  className={
-                    'badge badge-icon ' + (q.status === 'Entregue' ? 'green' : q.status === 'Solicitado' ? 'red' : 'gray')
-                  }
-                >
-                  {q.status === 'Entregue' ? <CircleCheck size={13} aria-hidden="true" /> : q.status === 'Solicitado' ? <Clock size={13} aria-hidden="true" /> : null}
-                  <span>{q.status}</span>
-                </span>
+                <div className="epi-request-status-stack">
+                  <span
+                    className={
+                      'badge badge-icon ' + (q.status === 'Entregue' ? 'green' : q.status === 'Solicitado' ? 'red' : 'gray')
+                    }
+                  >
+                    {q.status === 'Entregue' ? <CircleCheck size={13} aria-hidden="true" /> : q.status === 'Solicitado' ? <Clock size={13} aria-hidden="true" /> : null}
+                    <span>{q.status}</span>
+                  </span>
+                  {q.status === 'Entregue' && (
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(q.sheet_signed)}
+                      aria-label={'Marcar ficha de ' + q.employee + ' como assinada'}
+                      disabled={signingId === q.id}
+                      className={'epi-sign-switch' + (q.sheet_signed ? ' is-signed' : '')}
+                      onClick={() => toggleSigned(q)}
+                      title={q.sheet_signed ? 'Ficha assinada (clique para desmarcar)' : 'Marcar ficha como Assinada'}
+                    >
+                      <span className="epi-switch-track" aria-hidden="true">
+                        <span className="epi-switch-thumb" />
+                      </span>
+                      <span className="epi-switch-label">Assinada</span>
+                    </button>
+                  )}
+                </div>
               </header>
               <ul className="epi-request-items">
                 {q.items.map((i, idx) => {
@@ -260,11 +295,14 @@ export function Finance({ data, children }) {
   const movements=data.movements.filter(m=>within(m.created_at,range))
   const groups = expenseGroups(data.requests.filter(request => within(request.closed_at,range)))
   const sum = (list, fn) => list.reduce((s, x) => s + fn(x), 0)
-  const movementValue = (kind) =>
+  const movementCents = (kinds) =>
     sum(
-      movements.filter((m) => m.kind === kind),
+      movements.filter((m) => kinds.includes(m.kind)),
       (m) => m.qty * Math.round(Number(m.price) * 100),
-    ) / 100
+    )
+  const netEntryValue =
+    Math.max(0, movementCents(['Entrada', 'Ajuste de entrada']) - movementCents(['Ajuste de saída'])) / 100
+  const exitValue = movementCents(['Saída']) / 100
   const groupValue = (d) =>
     sum(
       groups.filter((g) => g.destination === d),
@@ -285,8 +323,8 @@ export function Finance({ data, children }) {
       >
         <div className="epi-metrics">
           {[
-            ['Entradas de material', movementValue('Entrada'), 'neutral'],
-            ['Saídas por entrega', movementValue('Saída'), 'neutral'],
+            ['Entradas de material', netEntryValue, 'neutral'],
+            ['Saídas por entrega', exitValue, 'neutral'],
             ['Despesas dos projetos', groupValue('Projeto'), 'rose'],
             [
               'Saldo financeiro em estoque · SSMA',

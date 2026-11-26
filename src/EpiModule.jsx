@@ -67,13 +67,17 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     setMessage('')
     const result = await rpc(db, 'manage', { action, p })
     await refresh()
-    if (action === 'deliver' || action === 'cancel') onChange?.()
+    if (['deliver', 'cancel', 'toggle_signed', 'entry', 'material', 'edit_material', 'delete_material'].includes(action)) onChange?.()
     setMessage(
       action === 'deliver'
         ? 'Entrega confirmada. Estoque, ficha e despesa atualizados.'
         : action === 'cancel'
           ? 'Pedido cancelado e reserva liberada.'
-          : 'Registro salvo.',
+          : action === 'toggle_signed'
+            ? result?.signed
+              ? 'Ficha validada como Assinada.'
+              : 'Marcação de assinatura removida.'
+            : 'Registro salvo.',
     )
     return result
   }

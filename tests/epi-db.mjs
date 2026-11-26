@@ -76,6 +76,8 @@ export async function epiFixture() {
     pg.transaction(async (tx) => {
       await tx.exec(actor ? 'set local role authenticated' : 'set local role anon')
       await tx.query("select set_config('request.jwt.claim.sub',$1,true)", [actor || ''])
+      if (name === 'ssma_epi_indicators')
+        return (await tx.query('select public.ssma_epi_indicators($1::jsonb) as result', [JSON.stringify(body.p || {})])).rows[0].result
       if (name === 'ssma_epi_logistics')
         return (await tx.query('select public.ssma_epi_logistics($1,$2::jsonb) as result',[body.action,JSON.stringify(body.p)])).rows[0].result
       if (name === 'ssma_epi_stock_costs')
@@ -121,7 +123,7 @@ export async function applySheetDistribution(pg) {
 export async function applyTechnicianStock(pg) {
   const dir=new URL('../supabase/migrations/',import.meta.url)
   const files=await readdir(dir)
-  for(const suffix of ['_estoque_do_tecnico.sql','_cadastro_unidade_validade_estoque.sql','_indicador_luvas_master.sql','_cadastro_atual_epi.sql','_limpeza_historico_financeiro_epi.sql','_luvas_entregues_tecnico.sql','_assistente_e_logistica.sql','_gestao_solicitacoes.sql','_projetos_cadastro_atual.sql','_cas_genericos.sql','_luva_sem_saldo.sql','_fichas_solicitacoes.sql','_emissao_entrega.sql','_ajustes_ficha_estoque_correios.sql','_historico_financeiro_individual.sql']){
+  for(const suffix of ['_estoque_do_tecnico.sql','_cadastro_unidade_validade_estoque.sql','_indicador_luvas_master.sql','_cadastro_atual_epi.sql','_limpeza_historico_financeiro_epi.sql','_luvas_entregues_tecnico.sql','_assistente_e_logistica.sql','_gestao_solicitacoes.sql','_projetos_cadastro_atual.sql','_cas_genericos.sql','_luva_sem_saldo.sql','_fichas_solicitacoes.sql','_emissao_entrega.sql','_ajustes_ficha_estoque_correios.sql','_historico_financeiro_individual.sql','_indicadores_estoque_assinatura_sincronizacao.sql']){
     await pg.exec(await readFile(new URL(files.find(f=>f.endsWith(suffix)),dir),'utf8'))
   }
 }

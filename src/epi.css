@@ -281,9 +281,11 @@
 }
 .epi-date-range.compact {
   margin: 0;
+  flex-wrap: nowrap;
 }
 .epi-date-range.compact .epi-field {
-  flex: 0 1 190px;
+  flex: 0 1 175px;
+  min-width: 150px;
 }
 .epi-field {
   display: grid;

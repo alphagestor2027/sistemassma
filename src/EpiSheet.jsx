@@ -145,7 +145,26 @@ function EmployeeSheets({db,id,request,profile,delivered,onIssued,archiveId,onAr
                   />
                 )}
                 {mode==='view' && (
-                  <div className="button-group">
+                  <div className="button-group" style={{flexWrap:'wrap'}}>
+                    <button
+                      type="button"
+                      role="switch"
+                      aria-checked={Boolean(doc?.signed)}
+                      aria-label="Marcar ficha aberta como assinada"
+                      disabled={busy}
+                      className={'epi-sign-switch' + (doc?.signed ? ' is-signed' : '')}
+                      onClick={()=>run(async()=>{
+                        const updated = await api('toggle_signed',{id:doc.id,signed:!doc?.signed})
+                        setDoc(updated)
+                        setContext(prev=>prev?({...prev,sheets:(prev.sheets||[]).map(s=>s.id===updated.id?{...s,signed:updated.signed,signed_at:updated.signed_at}:s)}):prev)
+                        onIssued?.()
+                      })}
+                    >
+                      <span className="epi-switch-track" aria-hidden="true">
+                        <span className="epi-switch-thumb" />
+                      </span>
+                      <span className="epi-switch-label">Assinada</span>
+                    </button>
                     <button className="secondary" disabled={busy} onClick={()=>setMode('edit')}>Editar ficha</button>
                     <button className="secondary" disabled={busy} onClick={()=>setConfirm(true)}>Excluir ficha</button>
                     <button className="primary" disabled={busy} onClick={()=>window.print()}><Printer size={15}/> Imprimir / PDF</button>
