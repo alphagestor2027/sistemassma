@@ -8,7 +8,7 @@ import {
   Archive,
   FileText,
   Hourglass,
-  Package,
+  Send,
   ClipboardCheck,
   X,
 } from 'lucide-react'
@@ -18,7 +18,7 @@ import { StockHistory } from './StockHistory'
 import { Sheet } from './EpiSheet'
 import { Logistics } from './EpiLogistics'
 import { Consolidated } from './EpiReports'
-import { Requests, Finance } from './EpiOperations'
+import { Requests, Finance, normalizeRequestStage } from './EpiOperations'
 import { rpc } from './EpiShared'
 import './epi.css'
 import './epi-sheet.css'
@@ -32,15 +32,21 @@ const tabs = [
   ['Correios', Truck],
   ['Histórico de movimentações', Archive],
 ]
+
 export default function EpiModule({ db, profile, employees, initialTab = 'Estoque', initialFocus, onTab, onChange }) {
   const [selected, setTab] = useState(initialTab),
     [data, setData] = useState(null),
     [error, setError] = useState(''),
-    [message, setMessage] = useState('')
+    [message, setMessage] = useState(''),
+    [requestFilter, setRequestFilter] = useState('')
   const [sheetRequest, setSheetRequest] = useState(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const canSheet = permitted(profile, 'epi.ficha')
-  const visible = tabs.filter(([label]) => (label==='Solicitações' && canSheet) || permitted(profile, 'epi.' + (label==='Estoque Consolidado'?'estoque':epiSections[label])))
+  const visible = tabs.filter(
+    ([label]) =>
+      (label === 'Solicitações' && canSheet) ||
+      permitted(profile, 'epi.' + (label === 'Estoque Consolidado' ? 'estoque' : epiSections[label])),
+  )
   const tab = visible.some(([label]) => label === selected) ? selected : visible[0]?.[0]
   const revision = useRef(0)
   const refresh = useCallback(async () => {
@@ -48,7 +54,8 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     try {
       const next = await rpc(db, 'workspace', {})
       if (version !== revision.current) return
-      if (!next && !['Correios','Histórico de movimentações'].includes(tab)) throw new Error('Perfil sem acesso ao módulo de EPI.')
+      if (!next && !['Correios', 'Histórico de movimentações'].includes(tab))
+        throw new Error('Perfil sem acesso ao módulo de EPI.')
       setData(next)
       setError('')
     } catch (e) {
@@ -67,10 +74,11 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     setMessage('')
     const result = await rpc(db, 'manage', { action, p })
     await refresh()
-    if (['deliver', 'cancel', 'toggle_signed', 'entry', 'material', 'edit_material', 'delete_material'].includes(action)) onChange?.()
+    if (['deliver', 'cancel', 'progress', 'toggle_signed', 'entry', 'material', 'edit_material', 'delete_material'].includes(action))
+      onChange?.()
     setMessage(
-      action === 'deliver'
-        ? 'Entrega confirmada. Estoque, ficha e despesa atualizados.'
+      action === 'deliver' || (action === 'progress' && p?.stage === 'Concluída')
+        ? 'Solicitação concluída. Estoque, ficha e despesa atualizados.'
         : action === 'cancel'
           ? 'Pedido cancelado e reserva liberada.'
           : action === 'toggle_signed'
@@ -85,33 +93,50 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
   useEffect(() => {
     setHeadingHost(document.getElementById('epi-heading-action'))
   }, [])
-  const props = { data, profile, employees, save, initialFocus:tab===initialTab?initialFocus:null }
-  const requests = data?.requests?.filter(q => !q.list_removed) || []
-  const month = new Date().toLocaleDateString('en-CA', {timeZone:'America/Sao_Paulo'}).slice(0,7)
-  const indicators = [
-    ['Solicitações abertas', requests.filter(q=>q.status==='Solicitado').length, FileText, 'red'],
-    ['Aguardando aprovação', requests.filter(q=>q.status==='Solicitado' && q.stage==='Aguardando aprovação do projeto').length, Hourglass, 'amber'],
-    ['Entregas no mês', requests.filter(q=>q.status==='Entregue' && q.closed_at && new Date(q.closed_at).toLocaleDateString('en-CA',{timeZone:'America/Sao_Paulo'}).slice(0,7)===month).length, Package, 'green'],
-    ['Solicitações entregues', requests.filter(q=>q.status==='Entregue').length, ClipboardCheck, 'blue'],
+  const props = { data, profile, employees, save, refresh, onChange, initialFocus: tab === initialTab ? initialFocus : null }
+  const requests = data?.requests?.filter((q) => !q.list_removed) || []
+
+  const requestIndicators = [
+    [
+      'Para Aprovação do Gestor',
+      requests.filter((q) => normalizeRequestStage(q) === 'Para Aprovação do Gestor').length,
+      Hourglass,
+      'amber',
+    ],
+    [
+      'Em Separação',
+      requests.filter((q) => normalizeRequestStage(q) === 'Em Separação').length,
+      Boxes,
+      'blue',
+    ],
+    [
+      'Enviada',
+      requests.filter((q) => normalizeRequestStage(q) === 'Enviada').length,
+      Send,
+      'violet',
+    ],
+    [
+      'Concluída',
+      requests.filter((q) => normalizeRequestStage(q) === 'Concluída').length,
+      ClipboardCheck,
+      'green',
+    ],
   ]
+
   const emitBtn = canSheet && (
-    <button className="primary epi-emit-btn" onClick={()=>{setSheetRequest(null);setSheetOpen(true)}}>
-      <FileText size={16} aria-hidden="true"/> Emitir ficha
+    <button
+      className="primary epi-emit-btn"
+      onClick={() => {
+        setSheetRequest(null)
+        setSheetOpen(true)
+      }}
+    >
+      <FileText size={16} aria-hidden="true" /> Emitir ficha
     </button>
   )
   return (
     <div className="epi">
       {headingHost && emitBtn && createPortal(emitBtn, headingHost)}
-      {data && permitted(profile,'epi.solicitacoes') && (
-        <div className="epi-indicators">
-          {indicators.map(([label,value,Icon,tone])=>(
-            <div className={'epi-indicator tone-' + tone} key={label}>
-              <span className="epi-indicator-icon"><Icon size={22} aria-hidden="true"/></span>
-              <div><span>{label}</span><strong>{value}</strong></div>
-            </div>
-          ))}
-        </div>
-      )}
       <div className="epi-bar">
         <nav aria-label="Seções de EPI">
           {visible.map(([name, I]) => (
@@ -145,41 +170,86 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
       )}
       <div className="epi-tab-content" key={tab}>
         {tab === 'Histórico de movimentações' ? (
-          <StockHistory db={db} profile={profile}/>
-        ) : tab==='Correios' ? (
-          <Logistics db={db} profile={profile} shipping/>
+          <StockHistory db={db} profile={profile} />
+        ) : tab === 'Correios' ? (
+          <Logistics db={db} profile={profile} shipping />
         ) : !data || !profile ? (
-          !error && <Skeleton label="Carregando o módulo de EPI…"/>
+          !error && <Skeleton label="Carregando o módulo de EPI…" />
         ) : (
           <>
             {tab === 'Estoque' && <Stock {...props} db={db} />}
-            {tab === 'Solicitações' && permitted(profile,'epi.solicitacoes') && (
-              <div className="epi-requests-layout">
-                <Requests
-                  {...props}
-                  onSheet={canSheet ? request=>{setSheetRequest({...request});setSheetOpen(true)} : null}
-                  refresh={refresh}
-                />
-                <aside className="epi-summary card">
-                  <h2>Resumo de solicitações</h2>
-                  <div className="epi-summary-list">
-                    {indicators.map(([label,value,Icon,tone])=>(
-                      <div className="epi-summary-item" key={label}>
-                        <span className={'epi-summary-icon tone-' + tone}><Icon size={16} aria-hidden="true"/></span>
-                        <span className="epi-summary-label">{label}</span>
-                        <strong>{value}</strong>
-                      </div>
-                    ))}
-                  </div>
-                  {visible.some(([name])=>name==='Estoque') && (
-                    <button className="epi-summary-cta" onClick={()=>{setTab('Estoque');onTab?.('Estoque')}}>
-                      Consultar estoque →
-                    </button>
-                  )}
-                </aside>
-              </div>
+            {tab === 'Solicitações' && permitted(profile, 'epi.solicitacoes') && (
+              <>
+                <div className="epi-indicators" role="region" aria-label="Indicadores de solicitações">
+                  {requestIndicators.map(([label, value, Icon, tone]) => {
+                    const active = requestFilter === label
+                    return (
+                      <button
+                        type="button"
+                        key={label}
+                        className={'epi-indicator epi-indicator-btn tone-' + tone + (active ? ' is-active' : '')}
+                        onClick={() => setRequestFilter(active ? '' : label)}
+                        title={active ? 'Limpar filtro de status' : 'Filtrar por ' + label}
+                      >
+                        <span className="epi-indicator-icon">
+                          <Icon size={22} aria-hidden="true" />
+                        </span>
+                        <div>
+                          <span>{label}</span>
+                          <strong>{value}</strong>
+                        </div>
+                      </button>
+                    )
+                  })}
+                </div>
+                <div className="epi-requests-layout">
+                  <Requests
+                    {...props}
+                    externalStatus={requestFilter}
+                    onExternalStatus={setRequestFilter}
+                    onSheet={
+                      canSheet
+                        ? (request) => {
+                            setSheetRequest({ ...request })
+                            setSheetOpen(true)
+                          }
+                        : null
+                    }
+                    refresh={refresh}
+                  />
+                  <aside className="epi-summary card">
+                    <h2>Resumo de solicitações</h2>
+                    <div className="epi-summary-list">
+                      {requestIndicators.map(([label, value, Icon, tone]) => (
+                        <div className="epi-summary-item" key={label}>
+                          <span className={'epi-summary-icon tone-' + tone}>
+                            <Icon size={16} aria-hidden="true" />
+                          </span>
+                          <span className="epi-summary-label">{label}</span>
+                          <strong>{value}</strong>
+                        </div>
+                      ))}
+                    </div>
+                    {visible.some(([name]) => name === 'Estoque') && (
+                      <button
+                        className="epi-summary-cta"
+                        onClick={() => {
+                          setTab('Estoque')
+                          onTab?.('Estoque')
+                        }}
+                      >
+                        Consultar estoque →
+                      </button>
+                    )}
+                  </aside>
+                </div>
+              </>
             )}
-            {tab === 'Financeiro' && <Finance {...props}><Logistics db={db} profile={profile} onSaved={refresh}/></Finance>}
+            {tab === 'Financeiro' && (
+              <Finance {...props}>
+                <Logistics db={db} profile={profile} onSaved={refresh} />
+              </Finance>
+            )}
             {tab === 'Estoque Consolidado' && <Consolidated data={data} db={db} />}
           </>
         )}
@@ -190,7 +260,9 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
         <div
           className="epi-sheet-overlay"
           role="presentation"
-          onClick={(e)=>{if(e.target===e.currentTarget) setSheetOpen(false)}}
+          onClick={(e) => {
+            if (e.target === e.currentTarget) setSheetOpen(false)
+          }}
         >
           <div className="epi-sheet-modal" role="dialog" aria-modal="true" aria-label="Emitir ficha de EPI">
             <header className="epi-sheet-modal-header">
@@ -198,17 +270,20 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
                 <h2>Ficha de Controle de EPI</h2>
                 <small>Emissão, histórico e termo de responsabilidade com visualização em tempo real</small>
               </div>
-              <button className="secondary epi-sheet-close-btn" onClick={()=>setSheetOpen(false)} aria-label="Fechar modal">
-                <X size={18}/> Fechar
+              <button className="secondary epi-sheet-close-btn" onClick={() => setSheetOpen(false)} aria-label="Fechar modal">
+                <X size={18} /> Fechar
               </button>
             </header>
             <div className="epi-sheet-modal-content">
               <Sheet
-                sheetRequest={data?.requests?.find(q=>q.id===sheetRequest?.id && !q.list_removed && q.status!=='Cancelado')}
-                clearRequest={()=>setSheetRequest(null)}
+                sheetRequest={data?.requests?.find((q) => q.id === sheetRequest?.id && !q.list_removed && q.status !== 'Cancelado')}
+                clearRequest={() => setSheetRequest(null)}
                 {...props}
                 db={db}
-                onIssued={() => {refresh(); onChange?.()}}
+                onIssued={() => {
+                  refresh()
+                  onChange?.()
+                }}
               />
             </div>
           </div>

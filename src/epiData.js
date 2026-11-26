@@ -97,3 +97,26 @@ export const stockAreas = {
 export function regionOf(uf) {
   return Object.keys(stockAreas).find((region) => stockAreas[region].split(' ').includes(uf)) || ''
 }
+
+export const REQUEST_STAGES = [
+  'Para Aprovação do Gestor',
+  'Em Separação',
+  'Enviada',
+  'Concluída',
+]
+
+export function normalizeRequestStage(q) {
+  if (!q) return 'Para Aprovação do Gestor'
+  if (q.status === 'Cancelado') return 'Cancelado'
+  if (q.status === 'Entregue' || q.stage === 'Concluída') return 'Concluída'
+  if (q.stage === 'Enviada' || q.stage === 'Enviado pelos Correios') return 'Enviada'
+  if (
+    q.stage === 'Em Separação' ||
+    q.stage === 'Pedido separado' ||
+    q.stage === 'Pronto para retirada na base'
+  ) {
+    return 'Em Separação'
+  }
+  return 'Para Aprovação do Gestor'
+}
+

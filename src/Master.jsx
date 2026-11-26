@@ -1,9 +1,10 @@
 import {Integrations} from './Assistant'
 import { GloveIndicators } from './EpiIndicators'
 import StockIndicators from './StockIndicators'
+import EpiModule from './EpiModule'
 import { Skeleton } from './Skeleton'
 import React, { useEffect, useState } from 'react'
-import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2, ChartNoAxesCombined } from 'lucide-react'
+import { Users, Heart, TriangleAlert, HardHat, GraduationCap, FileCheck2, ChartNoAxesCombined, Boxes } from 'lucide-react'
 import { modules, groups } from './config'
 import { epiSections } from './access'
 import { recentPeriod, matchesLocation } from './reportFilters'
@@ -135,7 +136,7 @@ function Permissions({ person, db, reload }) {
     </form>
   )
 }
-export default function Master({ db, days, Trend, managing, navigate, employees = [] }) {
+export default function Master({ db, profile, days, Trend, managing, navigate, employees = [], onDataChange }) {
   const [data, setData] = useState(null),
     [tech, setTech] = useState(''),
     [uf, setUf] = useState(''),
@@ -149,7 +150,8 @@ export default function Master({ db, days, Trend, managing, navigate, employees 
     [error, setError] = useState('')
   const [integrations,setIntegrations]=useState(false)
   const [stockTab,setStockTab]=useState(false)
-  useEffect(()=>{setIntegrations(false);setStockTab(false)},[managing])
+  const [epiOpsTab,setEpiOpsTab]=useState(false)
+  useEffect(()=>{setIntegrations(false);setStockTab(false);setEpiOpsTab(false)},[managing])
   async function reload() {
     const { data, error } = await db.rpc('ssma_master', { action: 'overview', p: {} })
     if (error) {
@@ -245,20 +247,24 @@ export default function Master({ db, days, Trend, managing, navigate, employees 
   return (
     <div className="epi">
       <nav className="button-group" aria-label="Administração Master">
-        <button className={managing||integrations||stockTab ? 'secondary' : 'primary'} onClick={() => {setIntegrations(false);setStockTab(false);navigate('master')}}>
+        <button className={managing||integrations||stockTab||epiOpsTab ? 'secondary' : 'primary'} onClick={() => {setIntegrations(false);setStockTab(false);setEpiOpsTab(false);navigate('master')}}>
           Visão geral
         </button>
-        <button className={stockTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);if(managing)navigate('master');setStockTab(true)}}>
+        <button className={epiOpsTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);setStockTab(false);if(managing)navigate('master');setEpiOpsTab(true)}}>
+          <Boxes size={16} aria-hidden="true" />
+          Estoque, Solicitações e Correios
+        </button>
+        <button className={stockTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);setEpiOpsTab(false);if(managing)navigate('master');setStockTab(true)}}>
           <ChartNoAxesCombined size={16} aria-hidden="true" />
           Indicadores de Estoque
         </button>
-        <button className={managing&&!integrations&&!stockTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);setStockTab(false);navigate('technicians')}}>
+        <button className={managing&&!integrations&&!stockTab&&!epiOpsTab ? 'primary' : 'secondary'} onClick={() => {setIntegrations(false);setStockTab(false);setEpiOpsTab(false);navigate('technicians')}}>
           <Users size={16} />
           Gestão de técnicos
         </button>
-        <button className={integrations?'primary':'secondary'} onClick={()=>{setStockTab(false);setIntegrations(true)}}>Integrações de IA</button>
+        <button className={integrations?'primary':'secondary'} onClick={()=>{setStockTab(false);setEpiOpsTab(false);setIntegrations(true)}}>Integrações de IA</button>
       </nav>
-      {integrations?<Integrations db={db}/>:stockTab?<StockIndicators db={db} profile={{is_master:true,active:true}} employees={employees} initialDays={days}/>:managing ? (
+      {integrations?<Integrations db={db}/>:epiOpsTab?<EpiModule db={db} profile={profile || {is_master:true,active:true}} employees={employees} onChange={()=>{reload();onDataChange?.()}}/>:stockTab?<StockIndicators db={db} profile={profile || {is_master:true,active:true}} employees={employees} initialDays={days}/>:managing ? (
         <>
           <Panel
             title="Técnicos de segurança"

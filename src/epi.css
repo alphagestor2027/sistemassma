@@ -475,8 +475,8 @@
 }
 
 /* ─── Consolidated & Cost Breakdown Alignment ─── */
-.epi-consolidated-panel th:nth-child(n+4),
-.epi-consolidated-panel td:nth-child(n+4),
+.epi-consolidated-panel th:nth-child(n+6),
+.epi-consolidated-panel td:nth-child(n+6),
 .epi-cost-panel th:last-child,
 .epi-cost-panel td:last-child {
   text-align: right;
@@ -1403,4 +1403,400 @@
   .epi-sheet-modal-header, .fepi-top-selector, .fepi-form-column, .fepi-preview-header { display: none !important; }
   .fepi-split-container { display: block; }
   .fepi-document-container { background: white; border: none; padding: 0; }
+}
+
+
+/* ─── Green Brand Spreadsheet Buttons, Stock Import, Logs & Correios Pagination ─── */
+.btn-green {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 9px 15px;
+  border-radius: 9px;
+  border: 1px solid #15803d;
+  background: linear-gradient(180deg, #16a34a 0%, #15803d 100%);
+  color: #ffffff;
+  font-weight: 650;
+  font-size: 13px;
+  white-space: nowrap;
+  box-shadow: 0 2px 6px rgba(21, 128, 61, 0.22);
+  transition: filter 150ms, transform 120ms;
+}
+.btn-green:hover:not(:disabled) {
+  filter: brightness(1.06);
+}
+.btn-green:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.btn-green-outline {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 7px;
+  padding: 8px 13px;
+  border-radius: 9px;
+  border: 1px solid #86efac;
+  background: #f0fdf4;
+  color: #166534;
+  font-weight: 650;
+  font-size: 12.5px;
+  white-space: nowrap;
+}
+.btn-green-outline:hover {
+  background: #dcfce7;
+  border-color: #22c55e;
+}
+
+.epi-indicator.tone-emerald .epi-indicator-icon,
+.epi-summary-icon.tone-emerald {
+  background: #d1fae5;
+  color: #059669;
+}
+.epi-indicator.tone-violet .epi-indicator-icon,
+.epi-summary-icon.tone-violet {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+.epi-indicator-btn {
+  text-align: left;
+  width: 100%;
+  cursor: pointer;
+}
+.epi-indicator-btn.is-active {
+  border-color: var(--red, #d11f35);
+  box-shadow: 0 0 0 3px rgba(209, 31, 53, 0.14);
+}
+
+.badge.amber {
+  background: #fef3c7;
+  color: #b45309;
+}
+.badge.violet {
+  background: #ede9fe;
+  color: #6d28d9;
+}
+
+.epi-stock-actions {
+  flex-wrap: wrap;
+}
+
+/* ─── Stock Import Panel & Progress Bar ─── */
+.stock-import-box,
+.stock-log-box {
+  margin: 4px 0 20px;
+  padding: 20px 22px;
+  border-radius: 14px;
+  border: 1px solid #bbf7d0;
+  background: #f8fdf9;
+  display: grid;
+  gap: 16px;
+}
+.stock-log-box {
+  border-color: #dbe3ee;
+  background: #f8fafc;
+}
+.stock-import-header,
+.stock-log-header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 16px;
+  flex-wrap: wrap;
+}
+.stock-import-header h3,
+.stock-log-header h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 6px;
+  font-size: 16px;
+  font-weight: 750;
+  color: #14532d;
+}
+.stock-log-header h3 {
+  color: #0f172a;
+}
+.stock-import-header p {
+  margin: 0;
+  font-size: 13px;
+  color: #334155;
+  line-height: 1.5;
+  max-width: 780px;
+}
+.stock-log-header small {
+  display: block;
+  color: #64748b;
+  font-size: 12.5px;
+}
+.stock-import-controls {
+  display: grid;
+  gap: 14px;
+}
+.stock-scope-lock {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 11px 14px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #a7f3d0;
+  color: #065f46;
+  font-size: 13px;
+}
+.stock-dropzone {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 14px;
+  padding: 22px 20px;
+  border: 2px dashed #4ade80;
+  border-radius: 12px;
+  background: #ffffff;
+  color: #15803d;
+  cursor: pointer;
+  transition: background 150ms, border-color 150ms;
+}
+.stock-dropzone:hover:not(.is-busy) {
+  background: #f0fdf4;
+  border-color: #16a34a;
+}
+.stock-dropzone.is-busy {
+  opacity: 0.72;
+  cursor: wait;
+}
+.stock-dropzone input[type="file"] {
+  display: none;
+}
+.stock-dropzone strong {
+  display: block;
+  font-size: 14px;
+  color: #14532d;
+}
+.stock-dropzone small {
+  display: block;
+  margin-top: 3px;
+  font-size: 12.5px;
+  color: #475569;
+}
+
+.stock-progress-card {
+  padding: 14px 16px;
+  border-radius: 11px;
+  background: #ffffff;
+  border: 1px solid #86efac;
+  display: grid;
+  gap: 8px;
+}
+.stock-progress-top {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  font-size: 13px;
+  color: #14532d;
+}
+.stock-progress-top span {
+  font-weight: 800;
+}
+.stock-progress-track {
+  height: 11px;
+  border-radius: 999px;
+  background: #dcfce7;
+  overflow: hidden;
+}
+.stock-progress-fill {
+  height: 100%;
+  border-radius: 999px;
+  background: linear-gradient(90deg, #16a34a 0%, #22c55e 50%, #15803d 100%);
+  transition: width 220ms ease;
+}
+
+.stock-log-summary {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.stock-log-pill {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 12px;
+  border-radius: 999px;
+  font-size: 12.5px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+  color: #334155;
+}
+button.stock-log-pill {
+  cursor: pointer;
+}
+.stock-log-pill.green {
+  background: #ecfdf5;
+  border-color: #a7f3d0;
+  color: #15803d;
+}
+.stock-log-pill.blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1d4ed8;
+}
+.stock-log-pill.red {
+  background: #fef2f2;
+  border-color: #fecaca;
+  color: #dc2626;
+}
+.stock-log-pill.gray {
+  background: #f1f5f9;
+  border-color: #cbd5e1;
+  color: #475569;
+}
+.stock-log-pill.active {
+  box-shadow: 0 0 0 2px currentColor;
+}
+.stock-log-pill.file-purged {
+  margin-left: auto;
+  background: #f0fdf4;
+  border-color: #86efac;
+  color: #166534;
+  font-weight: 600;
+}
+.stock-log-table-wrap {
+  max-height: 390px;
+  overflow-y: auto;
+  border: 1px solid #e2e8f0;
+  border-radius: 10px;
+  background: #ffffff;
+}
+
+/* ─── Correios KPIs, CEP Region Badge & Numeric Pagination ─── */
+.epi-shipping-kpis {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+  margin-bottom: 16px;
+}
+.epi-shipping-total-icon.tone-blue {
+  background: #dbeafe;
+  color: #2563eb;
+}
+.epi-shipping-total-icon.tone-amber {
+  background: #fef3c7;
+  color: #d97706;
+}
+.epi-shipping-filters {
+  padding-bottom: 14px;
+  border-bottom: 1px solid #f1f5f9;
+}
+.cep-region-badge {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px 14px;
+  border-radius: 10px;
+  background: #ecfdf5;
+  border: 1px solid #86efac;
+  color: #166534;
+  font-size: 13px;
+}
+.cep-region-badge.warning {
+  background: #fffbeb;
+  border-color: #fde68a;
+  color: #b45309;
+}
+.shipping-loc-cell {
+  display: inline-flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.shipping-pagination-bar {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid #f1f5f9;
+}
+.shipping-pagination-info {
+  font-size: 13px;
+  color: #64748b;
+}
+.shipping-pagination-info strong {
+  color: #0f172a;
+}
+
+@media screen {
+  [data-theme="dark"] .stock-import-box {
+    background: rgba(21, 128, 61, 0.1);
+    border-color: rgba(74, 222, 128, 0.35);
+  }
+  [data-theme="dark"] .stock-log-box {
+    background: #191f28;
+    border-color: #323b48;
+  }
+  [data-theme="dark"] .stock-import-header h3 {
+    color: #86efac;
+  }
+  [data-theme="dark"] .stock-log-header h3,
+  [data-theme="dark"] .shipping-pagination-info strong {
+    color: #f1f5f9;
+  }
+  [data-theme="dark"] .stock-import-header p,
+  [data-theme="dark"] .stock-dropzone small,
+  [data-theme="dark"] .shipping-pagination-info {
+    color: #cbd5e1;
+  }
+  [data-theme="dark"] .stock-dropzone,
+  [data-theme="dark"] .stock-progress-card,
+  [data-theme="dark"] .stock-log-table-wrap {
+    background: #1c222b;
+    border-color: #365343;
+  }
+  [data-theme="dark"] .stock-dropzone strong,
+  [data-theme="dark"] .stock-progress-top {
+    color: #86efac;
+  }
+  [data-theme="dark"] .stock-scope-lock,
+  [data-theme="dark"] .cep-region-badge,
+  [data-theme="dark"] .btn-green-outline,
+  [data-theme="dark"] .stock-log-pill.file-purged {
+    background: rgba(21, 128, 61, 0.2);
+    border-color: rgba(74, 222, 128, 0.4);
+    color: #a7f3d0;
+  }
+  [data-theme="dark"] .cep-region-badge.warning,
+  [data-theme="dark"] .badge.amber {
+    background: rgba(245, 158, 11, 0.2);
+    border-color: rgba(251, 191, 36, 0.4);
+    color: #fcd34d;
+  }
+  [data-theme="dark"] .badge.violet,
+  [data-theme="dark"] .epi-indicator.tone-violet .epi-indicator-icon,
+  [data-theme="dark"] .epi-summary-icon.tone-violet {
+    background: rgba(139, 92, 246, 0.2);
+    color: #c4b5fd;
+  }
+  [data-theme="dark"] .epi-indicator.tone-emerald .epi-indicator-icon,
+  [data-theme="dark"] .epi-summary-icon.tone-emerald {
+    background: rgba(16, 185, 129, 0.2);
+    color: #6ee7b7;
+  }
+  [data-theme="dark"] .shipping-pagination-bar,
+  [data-theme="dark"] .epi-shipping-filters {
+    border-color: #2b3340;
+  }
+}
+
+@media (max-width: 900px) {
+  .epi-shipping-kpis {
+    grid-template-columns: 1fr;
+  }
+  .stock-log-pill.file-purged {
+    margin-left: 0;
+  }
 }
