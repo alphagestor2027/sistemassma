@@ -7,6 +7,7 @@ import {
   Truck,
   Archive,
   FileText,
+  Inbox,
   Hourglass,
   Send,
   ClipboardCheck,
@@ -15,7 +16,7 @@ import {
 import { Skeleton } from './Skeleton'
 import { Stock } from './EpiStock'
 import { StockHistory } from './StockHistory'
-import { Sheet } from './EpiSheet'
+import { Sheet, RequestSheetPreview } from './EpiSheet'
 import { Logistics } from './EpiLogistics'
 import { Consolidated } from './EpiReports'
 import { Requests, Finance, normalizeRequestStage } from './EpiOperations'
@@ -39,7 +40,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     [error, setError] = useState(''),
     [message, setMessage] = useState(''),
     [requestFilter, setRequestFilter] = useState('')
-  const [sheetRequest, setSheetRequest] = useState(null)
+  const [previewRequest, setPreviewRequest] = useState(null)
   const [sheetOpen, setSheetOpen] = useState(false)
   const canSheet = permitted(profile, 'epi.ficha')
   const visible = tabs.filter(
@@ -74,18 +75,36 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     setMessage('')
     const result = await rpc(db, 'manage', { action, p })
     await refresh()
-    if (['deliver', 'cancel', 'progress', 'toggle_signed', 'entry', 'material', 'edit_material', 'delete_material'].includes(action))
+    if (
+      [
+        'deliver',
+        'cancel',
+        'progress',
+        'toggle_signed',
+        'entry',
+        'material',
+        'edit_material',
+        'delete_material',
+        'edit_request',
+        'remove_request',
+        'clear_requests',
+      ].includes(action)
+    )
       onChange?.()
     setMessage(
       action === 'deliver' || (action === 'progress' && p?.stage === 'Concluída')
         ? 'Solicitação concluída. Estoque, ficha e despesa atualizados.'
         : action === 'cancel'
           ? 'Pedido cancelado e reserva liberada.'
-          : action === 'toggle_signed'
-            ? result?.signed
-              ? 'Ficha validada como Assinada.'
-              : 'Marcação de assinatura removida.'
-            : 'Registro salvo.',
+          : action === 'remove_request'
+            ? 'Ficha / solicitação removida e saldo do estoque atualizado automaticamente.'
+            : action === 'edit_request'
+              ? 'Ficha / solicitação alterada e saldo do estoque atualizado automaticamente.'
+              : action === 'toggle_signed'
+                ? result?.signed
+                  ? 'Ficha validada como Assinada.'
+                  : 'Marcação de assinatura removida.'
+                : 'Registro salvo.',
     )
     return result
   }
@@ -97,6 +116,12 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
   const requests = data?.requests?.filter((q) => !q.list_removed) || []
 
   const requestIndicators = [
+    [
+      'Solicitações recebidas',
+      requests.filter((q) => normalizeRequestStage(q) === 'Solicitações recebidas').length,
+      Inbox,
+      'red',
+    ],
     [
       'Para Aprovação do Gestor',
       requests.filter((q) => normalizeRequestStage(q) === 'Para Aprovação do Gestor').length,
@@ -127,7 +152,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
     <button
       className="primary epi-emit-btn"
       onClick={() => {
-        setSheetRequest(null)
+        setPreviewRequest(null)
         setSheetOpen(true)
       }}
     >
@@ -180,7 +205,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
             {tab === 'Estoque' && <Stock {...props} db={db} />}
             {tab === 'Solicitações' && permitted(profile, 'epi.solicitacoes') && (
               <>
-                <div className="epi-indicators" role="region" aria-label="Indicadores de solicitações">
+                <div className="epi-indicators epi-indicators-5" role="region" aria-label="Indicadores de solicitações">
                   {requestIndicators.map(([label, value, Icon, tone]) => {
                     const active = requestFilter === label
                     return (
@@ -210,8 +235,8 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
                     onSheet={
                       canSheet
                         ? (request) => {
-                            setSheetRequest({ ...request })
-                            setSheetOpen(true)
+                            setSheetOpen(false)
+                            setPreviewRequest({ ...request })
                           }
                         : null
                     }
@@ -255,7 +280,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
         )}
       </div>
 
-      {/* Modal Moderno com Pré-visualização da Ficha na Lateral */}
+      {/* Modal Completo (botão Emitir ficha: emissão, histórico, edição e exclusão de fichas) */}
       {canSheet && sheetOpen && (
         <div
           className="epi-sheet-overlay"
@@ -268,7 +293,7 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
             <header className="epi-sheet-modal-header">
               <div>
                 <h2>Ficha de Controle de EPI</h2>
-                <small>Emissão, histórico e termo de responsabilidade com visualização em tempo real</small>
+                <small>Emissão, histórico, edição de itens e termo de responsabilidade com visualização em tempo real</small>
               </div>
               <button className="secondary epi-sheet-close-btn" onClick={() => setSheetOpen(false)} aria-label="Fechar modal">
                 <X size={18} /> Fechar
@@ -276,8 +301,8 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
             </header>
             <div className="epi-sheet-modal-content">
               <Sheet
-                sheetRequest={data?.requests?.find((q) => q.id === sheetRequest?.id && !q.list_removed && q.status !== 'Cancelado')}
-                clearRequest={() => setSheetRequest(null)}
+                sheetRequest={null}
+                clearRequest={() => {}}
                 {...props}
                 db={db}
                 onIssued={() => {
@@ -288,6 +313,15 @@ export default function EpiModule({ db, profile, employees, initialTab = 'Estoqu
             </div>
           </div>
         </div>
+      )}
+
+      {/* Modal Somente Pré-visualização (ao clicar em "Abrir ficha de EPI" na solicitação) */}
+      {canSheet && previewRequest && (
+        <RequestSheetPreview
+          db={db}
+          request={data?.requests?.find((q) => q.id === previewRequest.id) || previewRequest}
+          onClose={() => setPreviewRequest(null)}
+        />
       )}
     </div>
   )

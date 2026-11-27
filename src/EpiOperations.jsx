@@ -21,18 +21,37 @@ import {
   Package,
   Boxes,
   Send,
+  Inbox,
+  TriangleAlert,
+  RotateCcw,
 } from 'lucide-react'
 import { Panel, ActionForm, Field, Select, Table } from './EpiShared'
-import { money, variant, expenseGroups, stamp, nextStatus, REQUEST_STAGES, normalizeRequestStage } from './epiData'
+import { money, variant, expenseGroups, stamp, nextStatus, REQUEST_STAGES, normalizeRequestStage, available } from './epiData'
 import { today, dateLabel } from './data'
 import './stock-indicators.css'
 
 export { REQUEST_STAGES, normalizeRequestStage }
 
 const LEGACY_STAGE_FALLBACK = {
+  'Solicitações recebidas': 'Pedido recebido',
   'Para Aprovação do Gestor': 'Aguardando aprovação do projeto',
   'Em Separação': 'Pedido separado',
   Enviada: 'Enviado pelos Correios',
+}
+
+export function StockImpactNotice({ context = 'editada, alterada ou removida' }) {
+  return (
+    <div className="epi-stock-warning-banner" role="note">
+      <TriangleAlert size={18} aria-hidden="true" />
+      <div>
+        <strong>Aviso: atualização automática no estoque</strong>
+        <p>
+          Toda ficha ou solicitação que for {context} tem a quantidade refletida imediatamente no saldo físico do
+          estoque e nos lançamentos financeiros vinculados.
+        </p>
+      </div>
+    </div>
+  )
 }
 
 function personInitials(name) {
@@ -91,6 +110,14 @@ function StageBadge({ stage }) {
       </span>
     )
   }
+  if (stage === 'Para Aprovação do Gestor') {
+    return (
+      <span className="badge badge-icon amber">
+        <Clock size={13} aria-hidden="true" />
+        <span>Para Aprovação do Gestor</span>
+      </span>
+    )
+  }
   if (stage === 'Cancelado') {
     return (
       <span className="badge badge-icon gray">
@@ -99,10 +126,172 @@ function StageBadge({ stage }) {
     )
   }
   return (
-    <span className="badge badge-icon amber">
-      <Clock size={13} aria-hidden="true" />
-      <span>Para Aprovação do Gestor</span>
+    <span className="badge badge-icon red">
+      <Inbox size={13} aria-hidden="true" />
+      <span>Solicitações recebidas</span>
     </span>
+  )
+}
+
+function RequestItemsEditor({ request, materials, onSave, onCancel }) {
+  const [quantities, setQuantities] = useState(() =>
+    Object.fromEntries(request.complete.map((i) => [i.material_id, String(i.qty)])),
+  )
+  const [removedIds, setRemovedIds] = useState([])
+  const [note, setNote] = useState(request.management_note || '')
+  const [postal, setPostal] = useState(request.postal || '')
+  const [busy, setBusy] = useState(false)
+  const [err, setErr] = useState('')
+
+  const keptCount = request.complete.filter((i) => !removedIds.includes(i.material_id)).length
+
+  function toggleRemoveItem(materialId) {
+    setErr('')
+    if (removedIds.includes(materialId)) {
+      setRemovedIds((prev) => prev.filter((id) => id !== materialId))
+    } else {
+      if (keptCount <= 1) {
+        setErr(
+          'A ficha precisa manter ao menos 1 item. Para retirar todos os itens e estorná-los ao estoque, clique no botão "Remover" da solicitação.',
+        )
+        return
+      }
+      setRemovedIds((prev) => [...prev, materialId])
+    }
+  }
+
+  async function handleSubmit(e) {
+    e.preventDefault()
+    if (busy) return
+    setBusy(true)
+    setErr('')
+    try {
+      const parsedQuantities = {}
+      for (const item of request.complete) {
+        if (removedIds.includes(item.material_id)) continue
+        const n = Number(quantities[item.material_id])
+        if (!Number.isInteger(n) || n < 1) {
+          throw new Error(`Informe uma quantidade inteira válida (mínimo 1) para ${variant(item)}.`)
+        }
+        parsedQuantities[item.material_id] = n
+      }
+      await onSave({
+        request_id: request.id,
+        status: request.status,
+        previous_note: request.management_note || '',
+        previous_postal: request.postal || '',
+        note,
+        postal,
+        previous_qty: Object.fromEntries(request.complete.map((i) => [i.material_id, i.qty])),
+        quantities: parsedQuantities,
+        removed_materials: removedIds,
+      })
+      onCancel()
+    } catch (error) {
+      setErr(error.message || 'Não foi possível salvar as alterações da ficha.')
+    } finally {
+      setBusy(false)
+    }
+  }
+
+  return (
+    <form className="epi-request-edit-box" onSubmit={handleSubmit}>
+      <StockImpactNotice context="editada ou tiver itens alterados ou excluídos" />
+
+      <div className="epi-edit-items-list">
+        <h4>Itens da ficha / solicitação</h4>
+        {request.complete.map((item) => {
+          const isRemoved = removedIds.includes(item.material_id)
+          const stockMat = materials.find((m) => m.id === item.material_id)
+          const extraAvail = stockMat ? available(stockMat) : 0
+          const currentVal = Number(quantities[item.material_id] || item.qty)
+          const diff = isRemoved ? -item.qty : currentVal - item.qty
+
+          return (
+            <div key={item.material_id} className={'epi-edit-item-row' + (isRemoved ? ' is-removed' : '')}>
+              <div className="epi-edit-item-info">
+                <strong>{variant(item)}</strong>
+                <small>
+                  Quantidade original: {item.qty}
+                  {stockMat ? ` · Disponível no estoque: ${extraAvail}` : ''}
+                  {diff !== 0 && (
+                    <span className={'epi-stock-delta ' + (diff < 0 ? 'return' : 'consume')}>
+                      {diff < 0
+                        ? ` (+${Math.abs(diff)} retorna ao estoque)`
+                        : ` (-${diff} sai do estoque)`}
+                    </span>
+                  )}
+                </small>
+              </div>
+              <div className="epi-edit-item-controls">
+                {!isRemoved && (
+                  <label className="epi-inline-qty">
+                    <span>Qtd.</span>
+                    <input
+                      type="number"
+                      min={1}
+                      step={1}
+                      required
+                      disabled={busy}
+                      value={quantities[item.material_id] ?? item.qty}
+                      onChange={(e) =>
+                        setQuantities((prev) => ({ ...prev, [item.material_id]: e.target.value }))
+                      }
+                    />
+                  </label>
+                )}
+                <button
+                  type="button"
+                  disabled={busy}
+                  className={isRemoved ? 'secondary btn-sm' : 'btn-soft-danger btn-sm'}
+                  onClick={() => toggleRemoveItem(item.material_id)}
+                >
+                  {isRemoved ? (
+                    <>
+                      <RotateCcw size={13} aria-hidden="true" /> Restaurar item
+                    </>
+                  ) : (
+                    <>
+                      <Trash2 size={13} aria-hidden="true" /> Excluir item
+                    </>
+                  )}
+                </button>
+              </div>
+            </div>
+          )
+        })}
+      </div>
+
+      <div className="epi-filters" style={{ marginTop: 10 }}>
+        <Field
+          label="Observação da solicitação"
+          value={note}
+          onChange={(e) => setNote(e.target.value)}
+          maxLength={500}
+        />
+        <Field
+          label="Rastreio dos Correios"
+          value={postal}
+          onChange={(e) => setPostal(e.target.value)}
+          maxLength={64}
+        />
+      </div>
+
+      {err && (
+        <p role="alert" className="form-error">
+          {err}
+        </p>
+      )}
+
+      <div className="button-group">
+        <button type="button" className="secondary" disabled={busy} onClick={onCancel}>
+          Cancelar edição
+        </button>
+        <button type="submit" className="primary" disabled={busy}>
+          {busy ? 'Salvando e atualizando estoque…' : 'Salvar alterações da ficha'}
+        </button>
+      </div>
+    </form>
   )
 }
 
@@ -141,7 +330,6 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
         previous_postal: q.postal,
       })
     } catch (err) {
-      // Fallback caso a migração SQL nova ainda não tenha sido aplicada no banco
       if (/Etapa inválida|Status inválido/i.test(err.message || '')) {
         if (p.stage === 'Concluída') {
           if (p.postal && p.postal !== q.postal) {
@@ -210,9 +398,10 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
     >
       {action === 'clear' && (
         <ActionForm submit="Confirmar limpeza" onSave={() => save('clear_requests', {})} onDone={() => setAction('')}>
+          <StockImpactNotice context="limpa com reservas abertas" />
           <p>
-            Remover todas as solicitações do seu acesso, em todos os períodos e situações? As reservas pendentes serão
-            liberadas. As entregas continuarão no financeiro e nas fichas.
+            Remover todas as solicitações da listagem? As reservas pendentes voltarão imediatamente ao saldo disponível
+            do estoque.
           </p>
           <button type="button" className="secondary" onClick={() => setAction('')}>
             Voltar
@@ -343,7 +532,7 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
                 <div className="epi-request-actions">
                   <details>
                     <summary>Cancelar solicitação</summary>
-                    <p>A reserva dos materiais será liberada.</p>
+                    <StockImpactNotice context="cancelada" />
                     <ActionForm submit="Confirmar cancelamento" onSave={() => save('cancel', { request_id: q.id })} />
                   </details>
                 </div>
@@ -369,12 +558,14 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
                       <FileText size={15} aria-hidden="true" /> Abrir ficha de EPI
                     </button>
                   )}
-                  <button
-                    className="secondary btn-sm"
-                    onClick={() => setAction(action === 'edit' + q.id ? '' : 'edit' + q.id)}
-                  >
-                    <Pencil size={14} aria-hidden="true" /> Editar
-                  </button>
+                  {q.status !== 'Cancelado' && (
+                    <button
+                      className="secondary btn-sm"
+                      onClick={() => setAction(action === 'edit' + q.id ? '' : 'edit' + q.id)}
+                    >
+                      <Pencil size={14} aria-hidden="true" /> Editar ficha
+                    </button>
+                  )}
                   <button
                     className="btn-soft-danger btn-sm"
                     onClick={() => setAction(action === 'remove' + q.id ? '' : 'remove' + q.id)}
@@ -383,53 +574,34 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
                   </button>
                 </div>
               </div>
+
               {action === 'edit' + q.id && (
-                <ActionForm
-                  submit="Salvar edição"
-                  onDone={() => setAction('')}
-                  onSave={(p) =>
-                    save('edit_request', {
-                      request_id: q.id,
-                      status: q.status,
-                      previous_note: q.management_note || '',
-                      previous_postal: q.postal,
-                      note: p.note,
-                      postal: p.postal,
-                      previous_qty: Object.fromEntries(q.complete.map((i) => [i.material_id, i.qty])),
-                      quantities: p,
-                    })
-                  }
-                >
-                  <Field label="Observação da solicitação" name="note" defaultValue={q.management_note} maxLength={500} />
-                  <Field label="Rastreio dos Correios" name="postal" defaultValue={q.postal} maxLength={64} />
-                  {q.status === 'Solicitado' &&
-                    q.complete.map((i) => (
-                      <Field
-                        key={i.material_id}
-                        label={'Quantidade · ' + variant(i)}
-                        name={i.material_id}
-                        type="number"
-                        min={1}
-                        required
-                        defaultValue={i.qty}
-                      />
-                    ))}
-                  <button type="button" className="secondary" onClick={() => setAction('')}>
-                    Cancelar edição
-                  </button>
-                </ActionForm>
+                <RequestItemsEditor
+                  request={q}
+                  materials={data.materials || []}
+                  onSave={(payload) => save('edit_request', payload)}
+                  onCancel={() => setAction('')}
+                />
               )}
+
               {action === 'remove' + q.id && (
-                <ActionForm
-                  submit="Confirmar remoção"
-                  onDone={() => setAction('')}
-                  onSave={() => save('remove_request', { request_id: q.id })}
-                >
-                  <p>Remover esta solicitação da lista? Uma reserva pendente será liberada.</p>
-                  <button type="button" className="secondary" onClick={() => setAction('')}>
-                    Voltar
-                  </button>
-                </ActionForm>
+                <div className="epi-request-remove-box">
+                  <StockImpactNotice context="removida ou excluída" />
+                  <ActionForm
+                    submit="Confirmar exclusão e estornar estoque"
+                    onDone={() => setAction('')}
+                    onSave={() => save('remove_request', { request_id: q.id })}
+                  >
+                    <p>
+                      {q.status === 'Entregue'
+                        ? 'Excluir esta ficha de entrega? Todos os materiais entregues retornarão ao saldo do estoque e o lançamento financeiro de saída será estornado.'
+                        : 'Remover esta solicitação? As unidades reservadas voltarão imediatamente para o saldo disponível do estoque.'}
+                    </p>
+                    <button type="button" className="secondary" onClick={() => setAction('')}>
+                      Voltar
+                    </button>
+                  </ActionForm>
+                </div>
               )}
             </article>
           )
@@ -442,9 +614,6 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
 }
 
 export function Finance({ data, children }) {
-  const [project, setProject] = useState(''),
-    [center, setCenter] = useState(''),
-    [contract, setContract] = useState('')
   const [range, setRange] = useState({ start: '', end: '' })
   const movements = data.movements.filter((m) => within(m.created_at, range))
   const groups = expenseGroups(data.requests.filter((request) => within(request.closed_at, range)))
@@ -462,10 +631,7 @@ export function Finance({ data, children }) {
       groups.filter((g) => g.destination === d),
       (g) => g.cents,
     ) / 100
-  const scoped = groups.filter(
-    (g) =>
-      (!project || g.project === project) && (!center || g.center === center) && (!contract || g.contract === contract),
-  )
+
   return (
     <>
       <Panel
@@ -496,52 +662,6 @@ export function Finance({ data, children }) {
         {children}
         <CostBreakdown requests={data.requests.filter((q) => within(q.closed_at, range))} />
       </div>
-      <Panel title="Despesas por projeto e material">
-        <div className="epi-filters epi-three-col">
-          {[
-            ['Projeto / unidade', 'project', project, setProject],
-            ['Centro de custo', 'center', center, setCenter],
-            ['Contrato', 'contract', contract, setContract],
-          ].map(([label, k, v, set]) => (
-            <Select
-              key={k}
-              label={label}
-              placeholder="Todos"
-              value={v}
-              options={[...new Set(groups.map((g) => g[k]).filter(Boolean))]}
-              onChange={(e) => set(e.target.value)}
-            />
-          ))}
-        </div>
-        <Table
-          headers={[
-            'Destino do custo',
-            'Projeto atendido',
-            'UF',
-            'Centro de custo',
-            'Contrato',
-            'Material / grade',
-            'Entregue',
-            'Despesa',
-          ]}
-          rows={scoped.map((g) => [
-            g.destination,
-            g.project,
-            g.state ? <span className="uf-pill">{g.state}</span> : '—',
-            g.center || '—',
-            g.contract || '—',
-            g.material,
-            <span className="num-cell">{g.qty}</span>,
-            <strong className="money-strong">{money(g.cents / 100)}</strong>,
-          ])}
-          empty="Nenhuma entrega confirmada para este filtro."
-        />
-        {!!scoped.length && (
-          <p className="epi-total">
-            Total selecionado <strong>{money(sum(scoped, (g) => g.cents) / 100)}</strong>
-          </p>
-        )}
-      </Panel>
       <Panel title="Extrato de entradas e saídas">
         <Table
           headers={['Data', 'Movimento', 'Material', 'Quantidade', 'Valor unitário', 'Valor total']}

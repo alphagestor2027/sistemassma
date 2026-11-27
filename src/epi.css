@@ -1800,3 +1800,287 @@ button.stock-log-pill {
     margin-left: 0;
   }
 }
+
+
+/* ─── 5-Card Requests Grid, Stock Impact Warning, Ficha Item Editor, Preview-Only Modal & Project Breakdown ─── */
+.epi-indicators.epi-indicators-5 {
+  grid-template-columns: repeat(5, minmax(0, 1fr));
+}
+
+.epi-stock-warning-banner {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 12px 15px;
+  margin: 8px 0;
+  border-radius: 10px;
+  background: #fffbeb;
+  border: 1px solid #fcd34d;
+  color: #92400e;
+  font-size: 13px;
+  line-height: 1.45;
+}
+.epi-stock-warning-banner svg {
+  flex-shrink: 0;
+  color: #d97706;
+  margin-top: 2px;
+}
+.epi-stock-warning-banner strong {
+  display: block;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #78350f;
+  margin-bottom: 2px;
+}
+.epi-stock-warning-banner p {
+  margin: 0;
+  color: #92400e;
+}
+
+.epi-request-edit-box,
+.epi-request-remove-box {
+  margin-top: 6px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: grid;
+  gap: 12px;
+}
+.epi-edit-items-list {
+  display: grid;
+  gap: 8px;
+}
+.epi-edit-items-list h4 {
+  margin: 4px 0 4px;
+  font-size: 13.5px;
+  font-weight: 700;
+  color: #0f172a;
+}
+.epi-edit-item-row {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 14px;
+  flex-wrap: wrap;
+  padding: 10px 14px;
+  border-radius: 10px;
+  border: 1px solid #e2e8f0;
+  background: #ffffff;
+}
+.epi-edit-item-row.is-removed {
+  opacity: 0.62;
+  background: #fef2f2;
+  border-color: #fecaca;
+}
+.epi-edit-item-row.is-removed .epi-edit-item-info strong {
+  text-decoration: line-through;
+}
+.epi-edit-item-info {
+  flex: 1 1 220px;
+  min-width: 0;
+}
+.epi-edit-item-info strong {
+  display: block;
+  font-size: 13.5px;
+  color: #0f172a;
+}
+.epi-edit-item-info small {
+  margin-top: 2px;
+  font-size: 12px;
+  color: #64748b;
+}
+.epi-stock-delta {
+  font-weight: 700;
+  margin-left: 4px;
+}
+.epi-stock-delta.return {
+  color: #15803d;
+}
+.epi-stock-delta.consume {
+  color: #dc2626;
+}
+.epi-edit-item-controls {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.epi-inline-qty {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 12.5px;
+  font-weight: 600;
+  color: #334155;
+}
+.epi-inline-qty input {
+  width: 76px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 13.5px;
+  font-weight: 650;
+  text-align: center;
+}
+.epi-inline-reason {
+  max-width: 210px;
+  padding: 6px 10px;
+  border-radius: 8px;
+  border: 1px solid #cbd5e1;
+  font-size: 12.5px;
+}
+
+/* ─── Preview-Only Modal ("Abrir ficha de EPI") ─── */
+.epi-preview-only-modal {
+  width: min(980px, 96vw);
+}
+.epi-preview-only-body {
+  background: #eef2f6;
+  display: flex;
+  justify-content: center;
+  padding: 24px 20px 36px;
+}
+.fepi-document-standalone {
+  max-height: none;
+  border: 0;
+  background: transparent;
+  padding: 0;
+  width: 100%;
+}
+
+/* ─── Clickable Breakdown ("Valor entregue por projeto e região") ─── */
+.epi-click-hint {
+  font-size: 12px;
+  color: #64748b;
+  font-weight: 500;
+}
+.epi-breakdown-link {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+  background: transparent;
+  border: 0;
+  padding: 4px 8px;
+  margin-left: -8px;
+  border-radius: 7px;
+  color: #0f172a;
+  font-weight: 650;
+  font-size: 13px;
+  cursor: pointer;
+  text-align: left;
+  transition: background 140ms, color 140ms;
+}
+.epi-breakdown-link:hover {
+  background: #f1f5f9;
+  color: var(--red, #d11f35);
+}
+.epi-breakdown-link.is-active {
+  background: #fff1f2;
+  color: #be123c;
+}
+.epi-breakdown-chevron {
+  transition: transform 150ms ease;
+  color: #64748b;
+}
+.epi-breakdown-link.is-active .epi-breakdown-chevron {
+  transform: rotate(90deg);
+  color: #be123c;
+}
+.epi-project-materials-drawer {
+  margin-top: 18px;
+  padding: 16px 18px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+  display: grid;
+  gap: 12px;
+}
+.epi-project-materials-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  flex-wrap: wrap;
+}
+.epi-project-materials-head h3 {
+  display: inline-flex;
+  align-items: center;
+  gap: 8px;
+  margin: 0 0 3px;
+  font-size: 15px;
+  font-weight: 750;
+  color: #0f172a;
+}
+.epi-project-materials-head small {
+  color: #64748b;
+  font-size: 12.5px;
+}
+
+@media screen {
+  [data-theme="dark"] .epi-stock-warning-banner {
+    background: rgba(245, 158, 11, 0.14);
+    border-color: rgba(251, 191, 36, 0.4);
+    color: #fde68a;
+  }
+  [data-theme="dark"] .epi-stock-warning-banner strong {
+    color: #fef3c7;
+  }
+  [data-theme="dark"] .epi-stock-warning-banner p {
+    color: #fde68a;
+  }
+  [data-theme="dark"] .epi-request-edit-box,
+  [data-theme="dark"] .epi-request-remove-box,
+  [data-theme="dark"] .epi-project-materials-drawer {
+    background: #161b23;
+    border-color: #2d3643;
+  }
+  [data-theme="dark"] .epi-edit-item-row {
+    background: #1c222b;
+    border-color: #323b48;
+  }
+  [data-theme="dark"] .epi-edit-item-row.is-removed {
+    background: rgba(220, 38, 38, 0.12);
+    border-color: rgba(248, 113, 113, 0.35);
+  }
+  [data-theme="dark"] .epi-edit-items-list h4,
+  [data-theme="dark"] .epi-edit-item-info strong,
+  [data-theme="dark"] .epi-project-materials-head h3,
+  [data-theme="dark"] .epi-breakdown-link {
+    color: #f1f5f9;
+  }
+  [data-theme="dark"] .epi-breakdown-link:hover {
+    background: #28313d;
+    color: #fda4af;
+  }
+  [data-theme="dark"] .epi-breakdown-link.is-active {
+    background: rgba(225, 29, 72, 0.16);
+    color: #fda4af;
+  }
+  [data-theme="dark"] .epi-stock-delta.return {
+    color: #86efac;
+  }
+  [data-theme="dark"] .epi-stock-delta.consume {
+    color: #fca5a5;
+  }
+  [data-theme="dark"] .epi-preview-only-body {
+    background: #141820;
+  }
+}
+
+@media (max-width: 1280px) {
+  .epi-indicators.epi-indicators-5 {
+    grid-template-columns: repeat(3, minmax(0, 1fr));
+  }
+}
+@media (max-width: 900px) {
+  .epi-indicators.epi-indicators-5 {
+    grid-template-columns: repeat(2, minmax(0, 1fr));
+  }
+}
+@media print {
+  .epi-preview-only-body {
+    background: white !important;
+    padding: 0 !important;
+  }
+}

@@ -248,16 +248,31 @@ test('importação de estoque via planilha: isolamento por técnico, atualizaç�
     assert.equal((await manage(tech, 'import_logs', {})).length, 1)
     assert.equal((await manage(owner, 'import_logs', {})).length, 1)
 
-    // 4. Solicitações com os novos status: Para Aprovação do Gestor -> Em Separação -> Enviada -> Concluída
+    // 4. Solicitações com os 5 status: Solicitações recebidas -> Para Aprovação do Gestor -> Em Separação -> Enviada -> Concluída
+    const goggles = techWs.materials.find((m) => m.ca === '11268')
     const reqId = randomUUID()
     await call(null, 'ssma_epi_portal', {
       action: 'submit',
-      p: { employee_id: employee, id: reqId, items: [{ id: updatedBoot.id, qty: 2 }] },
+      p: {
+        employee_id: employee,
+        id: reqId,
+        items: [
+          { id: updatedBoot.id, qty: 2 },
+          { id: goggles.id, qty: 3 },
+        ],
+      },
     })
     let req = (await call(tech, 'ssma_epi_workspace')).requests.find((q) => q.id === reqId)
-    assert.equal(req.stage, 'Para Aprovação do Gestor')
-    assert.equal(normalizeRequestStage(req), 'Para Aprovação do Gestor')
+    assert.equal(req.stage, 'Solicitações recebidas')
+    assert.equal(normalizeRequestStage(req), 'Solicitações recebidas')
 
+    await manage(tech, 'progress', {
+      request_id: reqId,
+      stage: 'Para Aprovação do Gestor',
+      previous_stage: 'Solicitações recebidas',
+      previous_postal: '',
+      postal: '',
+    })
     await manage(tech, 'progress', {
       request_id: reqId,
       stage: 'Em Separação',
@@ -280,13 +295,94 @@ test('importação de estoque via planilha: isolamento por técnico, atualizaç�
       postal: 'BR555666777DF',
     })
 
-    const wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    let wsAfterReq = await call(tech, 'ssma_epi_workspace')
     req = wsAfterReq.requests.find((q) => q.id === reqId)
     assert.equal(req.status, 'Entregue')
     assert.equal(req.stage, 'Concluída')
     assert.equal(normalizeRequestStage(req), 'Concluída')
     assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 13)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 27)
     assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).reserved, 0)
+
+    // 4b. Editar itens da solicitação concluída (alterar quantidade de Botina 2 -> 4 e excluir Óculos) altera o estoque automaticamente!
+    await manage(tech, 'edit_request', {
+      request_id: reqId,
+      status: 'Entregue',
+      note: 'Ajuste de itens entregues',
+      postal: 'BR555666777DF',
+      quantities: { [updatedBoot.id]: 4 },
+      removed_materials: [goggles.id],
+    })
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    // Botina: 13 - 2 = 11; Óculos excluído: 27 + 3 = 30 de volta ao estoque!
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 11)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 30)
+
+    // 4c. Remover solicitação/ficha concluída estorna as 4 Botinas de volta para 15 sem erro!
+    await manage(tech, 'remove_request', { request_id: reqId })
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 15)
+    assert.ok(!wsAfterReq.requests.some((q) => q.id === reqId))
+
+    // 4d. Emitir ficha manual, editar quantidade + excluir item em ssma_epi_sheet('edit') e excluir ficha
+    const sheetCtx = await call(tech, 'ssma_epi_sheet', {
+      action: 'context',
+      p: { employee_id: employee },
+    })
+    const manualSheetId = randomUUID()
+    const issuedDoc = await call(tech, 'ssma_epi_sheet', {
+      action: 'issue',
+      p: {
+        id: manualSheetId,
+        employee_id: employee,
+        version: sheetCtx.version,
+        new_items: [
+          { id: updatedBoot.id, qty: 3, reason: 'Inicial' },
+          { id: goggles.id, qty: 2, reason: 'Inicial' },
+        ],
+        settings: {
+          identity: { name: 'Ana Silva', unit: 'Projeto Norte' },
+          legal: 'Legal',
+          term: 'Termo',
+          logo: '',
+          place: 'Brasília',
+          reasons: {},
+        },
+      },
+    })
+    // Após emissão: Botina = 12, Óculos = 28
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 12)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 28)
+
+    // Edita ficha: reduz Botina de 3 -> 1 (+2 ao estoque -> 14) e exclui Óculos (+2 ao estoque -> 30)
+    const bootKey = `${manualSheetId}/${updatedBoot.id}`
+    const gogglesKey = `${manualSheetId}/${goggles.id}`
+    const editedDoc = await call(tech, 'ssma_epi_sheet', {
+      action: 'edit',
+      p: {
+        id: manualSheetId,
+        employee_id: employee,
+        revision: issuedDoc.revision,
+        removed: [gogglesKey],
+        item_quantities: { [bootKey]: 1 },
+        document_items: [],
+        settings: issuedDoc.settings,
+      },
+    })
+    assert.equal(editedDoc.snapshot.items.length, 1)
+    assert.equal(editedDoc.snapshot.items[0].qty, 1)
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 14)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 30)
+
+    // Exclui ficha editada: devolve a 1 Botina restante -> volta para 15!
+    await call(tech, 'ssma_epi_sheet', {
+      action: 'delete',
+      p: { id: manualSheetId, employee_id: employee, revision: editedDoc.revision },
+    })
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 15)
 
     // 5. Correios: CEP identificando UF, tipo Colaborador / Fornecedor / Outros e decisão de custo no projeto
     const logistics = (actor, action, p) => call(actor, 'ssma_epi_logistics', { action, p })

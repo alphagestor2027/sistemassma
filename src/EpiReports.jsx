@@ -1,7 +1,7 @@
 import React from 'react'
-import { Download, FileSpreadsheet } from 'lucide-react'
+import { Download, FileSpreadsheet, ChevronRight, Package, X } from 'lucide-react'
 import { Panel, Table, Field } from './EpiShared'
-import { money, regionLabel, regionOf } from './epiData'
+import { money, regionLabel, regionOf, stamp, variant } from './epiData'
 import { today } from './data'
 import { buildConsolidatedStockBytes, triggerXlsxDownload } from './spreadsheet'
 
@@ -49,15 +49,148 @@ export function totalsBy(rows, key, cents) {
     .map(([name, v]) => [name, <strong className="money-cell">{money(v / 100)}</strong>])
 }
 
+function groupedEntries(rows, key, cents) {
+  const totals = new Map()
+  for (const r of rows) {
+    const label = key(r) || 'Sem informação'
+    totals.set(label, (totals.get(label) || 0) + cents(r))
+  }
+  return [...totals].sort((a, b) => b[1] - a[1])
+}
+
 export function CostBreakdown({ requests }) {
+  const [selected, setSelected] = React.useState(null) // { kind: 'project' | 'region', label: string }
   const rows = requests.filter((q) => q.status === 'Entregue' && q.destination === 'Projeto')
   const cents = (q) => q.items.reduce((v, i) => v + i.qty * Math.round(Number(i.price) * 100), 0)
+
+  const byProject = groupedEntries(rows, (q) => q.project, cents)
+  const byRegion = groupedEntries(rows, (q) => regionOf(q.state), cents)
+
+  function toggleSelection(kind, label) {
+    setSelected((prev) => (prev?.kind === kind && prev?.label === label ? null : { kind, label }))
+  }
+
+  const detailItems = React.useMemo(() => {
+    if (!selected) return []
+    const matchingRequests = rows.filter((q) =>
+      selected.kind === 'project'
+        ? (q.project || 'Sem informação') === selected.label
+        : (regionOf(q.state) || 'Sem informação') === selected.label,
+    )
+    const aggregated = new Map()
+    for (const q of matchingRequests) {
+      for (const item of q.items || []) {
+        const matName = variant(item)
+        const key = `${q.project}|${q.state}|${item.material_id || matName}`
+        const cur = aggregated.get(key) || {
+          material: matName,
+          ca: item.ca || 'Sem CA',
+          project: q.project || '—',
+          state: q.state || '—',
+          employees: new Set(),
+          lastDate: q.closed_at || q.created_at,
+          qty: 0,
+          cents: 0,
+        }
+        if (q.employee) cur.employees.add(q.employee)
+        if ((q.closed_at || q.created_at) > cur.lastDate) cur.lastDate = q.closed_at || q.created_at
+        cur.qty += Number(item.qty || 0)
+        cur.cents += Number(item.qty || 0) * Math.round(Number(item.price || 0) * 100)
+        aggregated.set(key, cur)
+      }
+    }
+    return [...aggregated.values()].sort((a, b) => b.cents - a.cents)
+  }, [rows, selected])
+
+  const detailTotalCents = detailItems.reduce((s, x) => s + x.cents, 0)
+
   return (
-    <Panel title="Valor entregue por projeto e região" className="epi-cost-panel">
+    <Panel
+      title="Valor entregue por projeto e região"
+      className="epi-cost-panel"
+      action={<small className="epi-click-hint">Clique em um projeto ou região para ver os materiais enviados</small>}
+    >
       <div className="epi-split">
-        <Table headers={['Projeto', 'Valor']} rows={totalsBy(rows, (q) => q.project, cents)} />
-        <Table headers={['Região', 'Valor']} rows={totalsBy(rows, (q) => regionOf(q.state), cents)} />
+        <Table
+          headers={['Projeto', 'Valor']}
+          rows={byProject.map(([name, valCents]) => {
+            const active = selected?.kind === 'project' && selected?.label === name
+            return [
+              <button
+                type="button"
+                className={'epi-breakdown-link' + (active ? ' is-active' : '')}
+                onClick={() => toggleSelection('project', name)}
+              >
+                <ChevronRight size={15} className="epi-breakdown-chevron" aria-hidden="true" />
+                <span>{name}</span>
+              </button>,
+              <strong className="money-cell">{money(valCents / 100)}</strong>,
+            ]
+          })}
+          empty="Nenhuma entrega por projeto no período."
+        />
+
+        <Table
+          headers={['Região', 'Valor']}
+          rows={byRegion.map(([name, valCents]) => {
+            const active = selected?.kind === 'region' && selected?.label === name
+            return [
+              <button
+                type="button"
+                className={'epi-breakdown-link' + (active ? ' is-active' : '')}
+                onClick={() => toggleSelection('region', name)}
+              >
+                <ChevronRight size={15} className="epi-breakdown-chevron" aria-hidden="true" />
+                <span>{name}</span>
+              </button>,
+              <strong className="money-cell">{money(valCents / 100)}</strong>,
+            ]
+          })}
+          empty="Nenhuma entrega por região no período."
+        />
       </div>
+
+      {selected && (
+        <section className="epi-project-materials-drawer" aria-live="polite">
+          <header className="epi-project-materials-head">
+            <div>
+              <h3>
+                <Package size={17} aria-hidden="true" /> Materiais enviados para{' '}
+                {selected.kind === 'project' ? `o projeto ${selected.label}` : `a região ${selected.label}`}
+              </h3>
+              <small>
+                {detailItems.reduce((s, i) => s + i.qty, 0)} unidade(s) entregue(s) · Total:{' '}
+                <strong>{money(detailTotalCents / 100)}</strong>
+              </small>
+            </div>
+            <button type="button" className="secondary btn-sm" onClick={() => setSelected(null)}>
+              <X size={14} aria-hidden="true" /> Fechar materiais
+            </button>
+          </header>
+
+          <Table
+            headers={[
+              'Material enviado',
+              'CA',
+              selected.kind === 'region' ? 'Projeto' : 'Colaborador(es)',
+              'UF',
+              'Última entrega',
+              'Qtd.',
+              'Valor total',
+            ]}
+            rows={detailItems.map((it) => [
+              <strong className="material-strong">{it.material}</strong>,
+              <span className="ca-pill">{it.ca}</span>,
+              selected.kind === 'region' ? it.project : [...it.employees].join(', ') || '—',
+              it.state ? <span className="uf-pill">{it.state}</span> : '—',
+              it.lastDate ? stamp(it.lastDate) : '—',
+              <span className="num-cell">{it.qty}</span>,
+              <strong className="money-strong">{money(it.cents / 100)}</strong>,
+            ])}
+            empty="Nenhum material enviado encontrado para esta seleção."
+          />
+        </section>
+      )}
     </Panel>
   )
 }
@@ -96,7 +229,6 @@ export function Consolidated({ data, db }) {
     return code
   }
 
-  // Mapeia projetos e regiões atendidos por cada estoque (region_id)
   const projectsByRegionId = new Map()
   const macroRegionsByRegionId = new Map()
   for (const r of data.regions || []) {
@@ -163,7 +295,6 @@ export function Consolidated({ data, db }) {
     groups.set(key, g)
   }
 
-  // Mapa de CAs genéricos por CA principal para enriquecer a distribuição
   const genericsByCa = new Map()
   for (const g of groups.values()) {
     if (g.ca) genericsByCa.set(g.ca, [...g.aliases].join(', '))

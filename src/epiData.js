@@ -99,6 +99,7 @@ export function regionOf(uf) {
 }
 
 export const REQUEST_STAGES = [
+  'Solicitações recebidas',
   'Para Aprovação do Gestor',
   'Em Separação',
   'Enviada',
@@ -106,7 +107,7 @@ export const REQUEST_STAGES = [
 ]
 
 export function normalizeRequestStage(q) {
-  if (!q) return 'Para Aprovação do Gestor'
+  if (!q) return 'Solicitações recebidas'
   if (q.status === 'Cancelado') return 'Cancelado'
   if (q.status === 'Entregue' || q.stage === 'Concluída') return 'Concluída'
   if (q.stage === 'Enviada' || q.stage === 'Enviado pelos Correios') return 'Enviada'
@@ -117,6 +118,12 @@ export function normalizeRequestStage(q) {
   ) {
     return 'Em Separação'
   }
-  return 'Para Aprovação do Gestor'
+  if (
+    q.stage === 'Para Aprovação do Gestor' ||
+    q.stage === 'Aguardando aprovação do projeto'
+  ) {
+    return 'Para Aprovação do Gestor'
+  }
+  return 'Solicitações recebidas'
 }
 
