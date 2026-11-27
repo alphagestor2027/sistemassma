@@ -257,7 +257,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
   <cellStyleXfs count="1">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0"/>
   </cellStyleXfs>
-  <cellXfs count="13">
+  <cellXfs count="14">
     <xf numFmtId="0" fontId="0" fillId="0" borderId="0" xfId="0"/>
     <xf numFmtId="0" fontId="1" fillId="2" borderId="0" xfId="0" applyFont="1" applyFill="1" applyAlignment="1"><alignment vertical="center" horizontal="left" indent="1"/></xf>
     <xf numFmtId="0" fontId="2" fillId="3" borderId="1" xfId="0" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" horizontal="left" indent="1" wrapText="1"/></xf>
@@ -271,6 +271,7 @@ const STYLES_XML = `<?xml version="1.0" encoding="UTF-8" standalone="yes"?>
     <xf numFmtId="49" fontId="0" fillId="0" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" horizontal="center"/></xf>
     <xf numFmtId="49" fontId="0" fillId="5" borderId="1" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" horizontal="center"/></xf>
     <xf numFmtId="165" fontId="4" fillId="6" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" horizontal="center"/></xf>
+    <xf numFmtId="164" fontId="4" fillId="6" borderId="2" xfId="0" applyNumberFormat="1" applyFont="1" applyFill="1" applyBorder="1" applyAlignment="1"><alignment vertical="center" horizontal="right"/></xf>
   </cellXfs>
   <cellStyles count="1">
     <cellStyle name="Normal" xfId="0" builtinId="0"/>
@@ -328,7 +329,9 @@ function buildWorksheetXml(sheet) {
         const val = Array.isArray(rowData) ? rowData[cIdx] : rowData[col.key]
         const type = col.type || 'text'
         const style = isTotalRow
-          ? 12
+          ? type === 'currency'
+            ? 13
+            : 12
           : type === 'currency'
             ? odd
               ? 7
@@ -542,20 +545,33 @@ export const CONSOLIDATED_EXPORT_COLUMNS = [
   { key: 'material', header: 'Material', width: 38, type: 'text' },
   { key: 'ca', header: 'CA Principal', width: 16, type: 'code' },
   { key: 'generics', header: 'CA Genérico', width: 24, type: 'code' },
+  { key: 'region', header: 'Região', width: 20, type: 'text' },
+  { key: 'qty', header: 'Quantidade', width: 16, type: 'integer' },
+]
+
+export const DISTRIBUTION_EXPORT_COLUMNS = [
+  { key: 'material', header: 'Material', width: 38, type: 'text' },
+  { key: 'ca', header: 'CA Principal', width: 16, type: 'code' },
+  { key: 'generics', header: 'CA Genérico', width: 24, type: 'code' },
   { key: 'qty', header: 'Quantidade', width: 16, type: 'integer' },
   { key: 'project', header: 'Projeto', width: 28, type: 'text' },
   { key: 'region', header: 'Região', width: 20, type: 'text' },
 ]
 
+const exportStamp = () => new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })
+
 export function buildConsolidatedStockBytes(consolidatedRows, distributionRows = []) {
+  const totalQty = consolidatedRows.reduce((s, r) => s + Number(r.qty || 0), 0)
   const sheets = [
     {
       sheetName: 'Estoque Consolidado',
       title: 'SISTEMA SSMA 2.0 — RELATÓRIO DE ESTOQUE CONSOLIDADO',
-      subtitle: `Exportado em ${new Date().toLocaleString('pt-BR', { timeZone: 'America/Sao_Paulo' })} · Identidade Visual SSMA`,
+      subtitle: `Exportado em ${exportStamp()} · ${consolidatedRows.length} material(is) · ${totalQty.toLocaleString('pt-BR')} item(ns) no total`,
       columns: CONSOLIDATED_EXPORT_COLUMNS,
-      rows: consolidatedRows,
-      emptyFormattedRows: Math.max(1, consolidatedRows.length),
+      rows: [
+        ...consolidatedRows,
+        { material: 'TOTAL GERAL DE ITENS', ca: '', generics: '', region: '', qty: totalQty, __isTotal: true },
+      ],
     },
   ]
   if (distributionRows.length > 0) {
@@ -563,11 +579,99 @@ export function buildConsolidatedStockBytes(consolidatedRows, distributionRows =
       sheetName: 'Distribuição Projeto Região',
       title: 'SISTEMA SSMA 2.0 — DISTRIBUIÇÃO ENTREGUE POR PROJETO E REGIÃO',
       subtitle: 'Quantidades acumuladas entregues aos projetos por macrorregião.',
-      columns: CONSOLIDATED_EXPORT_COLUMNS,
+      columns: DISTRIBUTION_EXPORT_COLUMNS,
       rows: distributionRows,
     })
   }
   return buildGreenWorkbook(sheets)
+}
+
+/**
+ * Exportação consolidada dos itens enviados (Valor entregue por projeto e região) em um período.
+ * rows: [{ project, region, state, material, ca, qty, cents }]
+ */
+export function buildDeliveredPeriodBytes(rows, { start = '', end = '' } = {}) {
+  const fmt = (d) => (d ? d.split('-').reverse().join('/') : '')
+  const periodLabel = start || end ? `Período: ${fmt(start) || 'início'} a ${fmt(end) || 'hoje'}` : 'Período: todo o histórico'
+  const money = (c) => Math.round(c) / 100
+  const sorted = [...rows].sort(
+    (a, b) =>
+      String(a.project).localeCompare(String(b.project), 'pt-BR') ||
+      String(a.material).localeCompare(String(b.material), 'pt-BR'),
+  )
+  const totalQty = rows.reduce((s, r) => s + r.qty, 0)
+  const totalCents = rows.reduce((s, r) => s + r.cents, 0)
+
+  const group = (keyFn) => {
+    const map = new Map()
+    for (const r of rows) {
+      const k = keyFn(r) || 'Sem informação'
+      const g = map.get(k) || { label: k, qty: 0, cents: 0, materials: new Set() }
+      g.qty += r.qty
+      g.cents += r.cents
+      g.materials.add(r.material)
+      map.set(k, g)
+    }
+    return [...map.values()].sort((a, b) => b.cents - a.cents)
+  }
+
+  const summaryColumns = (label) => [
+    { key: 'label', header: label, width: 32, type: 'text' },
+    { key: 'materials', header: 'Materiais distintos', width: 20, type: 'integer' },
+    { key: 'qty', header: 'Quantidade enviada', width: 20, type: 'integer' },
+    { key: 'total', header: 'Valor total (R$)', width: 20, type: 'currency' },
+  ]
+  const summaryRows = (list, totalLabel) => [
+    ...list.map((g) => ({ label: g.label, materials: g.materials.size, qty: g.qty, total: money(g.cents) })),
+    { label: totalLabel, materials: '', qty: totalQty, total: money(totalCents), __isTotal: true },
+  ]
+
+  return buildGreenWorkbook([
+    {
+      sheetName: 'Itens enviados',
+      title: 'SISTEMA SSMA 2.0 — ITENS ENVIADOS POR PROJETO E REGIÃO (CONSOLIDADO)',
+      subtitle: `${periodLabel} · Exportado em ${exportStamp()}`,
+      columns: [
+        { key: 'project', header: 'Projeto', width: 26, type: 'text' },
+        { key: 'region', header: 'Região', width: 16, type: 'text' },
+        { key: 'state', header: 'UF', width: 8, type: 'code' },
+        { key: 'material', header: 'Material', width: 40, type: 'text' },
+        { key: 'ca', header: 'CA', width: 12, type: 'code' },
+        { key: 'qty', header: 'Quantidade', width: 14, type: 'integer' },
+        { key: 'unit', header: 'Valor unitário médio (R$)', width: 22, type: 'currency' },
+        { key: 'total', header: 'Valor total (R$)', width: 18, type: 'currency' },
+      ],
+      rows: [
+        ...sorted.map((r) => ({
+          project: r.project,
+          region: r.region,
+          state: r.state,
+          material: r.material,
+          ca: r.ca,
+          qty: r.qty,
+          unit: r.qty ? money(r.cents / r.qty) : 0,
+          total: money(r.cents),
+        })),
+        { project: 'TOTAL GERAL', region: '', state: '', material: '', ca: '', qty: totalQty, unit: '', total: money(totalCents), __isTotal: true },
+      ],
+    },
+    {
+      sheetName: 'Por projeto',
+      title: 'SISTEMA SSMA 2.0 — TOTAL ENVIADO POR PROJETO',
+      subtitle: periodLabel,
+      columns: summaryColumns('Projeto'),
+      rows: summaryRows(group((r) => r.project), 'TOTAL GERAL'),
+      showAutoFilter: false,
+    },
+    {
+      sheetName: 'Por região',
+      title: 'SISTEMA SSMA 2.0 — TOTAL ENVIADO POR REGIÃO',
+      subtitle: periodLabel,
+      columns: summaryColumns('Região'),
+      rows: summaryRows(group((r) => r.region), 'TOTAL GERAL'),
+      showAutoFilter: false,
+    },
+  ])
 }
 
 /* ─────────────────── Leitor Universal (.xlsx e .csv) para Importação ─────────────────── */

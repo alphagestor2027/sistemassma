@@ -59,7 +59,7 @@ export function forecast(material, rules, assignments, requests, horizon, date =
 
 export function expenseGroups(requests) {
   const groups = new Map()
-  for (const q of requests.filter((q) => q.status === 'Entregue'))
+  for (const q of requests.filter((q) => q.status === 'Entregue' && !q.list_removed))
     for (const item of q.items) {
       const fields = [q.destination, q.project, q.state, q.center, q.contract, item.material_id]
       const key = JSON.stringify(fields)

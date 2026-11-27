@@ -932,7 +932,7 @@ export function Sheet({ db, data, profile, onIssued, sheetRequest, clearRequest 
           id={id}
           profile={profile}
           onIssued={onIssued}
-          delivered={data?.requests?.filter((q) => q.employee_id === id && q.status === 'Entregue') || []}
+          delivered={data?.requests?.filter((q) => !q.list_removed && q.employee_id === id && q.status === 'Entregue') || []}
         />
       )}
 

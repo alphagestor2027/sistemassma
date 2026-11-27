@@ -1,9 +1,9 @@
 import React from 'react'
-import { Download, FileSpreadsheet, ChevronRight, Package, X } from 'lucide-react'
+import { Download, FileSpreadsheet, ChevronRight, Package, X, Layers, Boxes, Wallet } from 'lucide-react'
 import { Panel, Table, Field } from './EpiShared'
 import { money, regionLabel, regionOf, stamp, variant } from './epiData'
 import { today } from './data'
-import { buildConsolidatedStockBytes, triggerXlsxDownload } from './spreadsheet'
+import { buildConsolidatedStockBytes, buildDeliveredPeriodBytes, triggerXlsxDownload } from './spreadsheet'
 
 export function within(timestamp, { start, end }) {
   if (!timestamp) return false
@@ -58,13 +58,60 @@ function groupedEntries(rows, key, cents) {
   return [...totals].sort((a, b) => b[1] - a[1])
 }
 
-export function CostBreakdown({ requests }) {
+function aggregateDeliveredItems(matchingRequests) {
+  const aggregated = new Map()
+  for (const q of matchingRequests) {
+    const reg = regionOf(q.state) || 'Sem informação'
+    for (const item of q.items || []) {
+      const matName = variant(item)
+      const key = `${q.project || 'Sem informação'}|${reg}|${q.state || ''}|${item.material_id || matName}`
+      const cur = aggregated.get(key) || {
+        material: matName,
+        ca: item.ca || 'Sem CA',
+        project: q.project || 'Sem informação',
+        region: reg,
+        state: q.state || '—',
+        employees: new Set(),
+        lastDate: q.closed_at || q.created_at,
+        qty: 0,
+        cents: 0,
+      }
+      if (q.employee) cur.employees.add(q.employee)
+      if ((q.closed_at || q.created_at) > cur.lastDate) cur.lastDate = q.closed_at || q.created_at
+      cur.qty += Number(item.qty || 0)
+      cur.cents += Number(item.qty || 0) * Math.round(Number(item.price || 0) * 100)
+      aggregated.set(key, cur)
+    }
+  }
+  return [...aggregated.values()].sort((a, b) => b.cents - a.cents)
+}
+
+export function CostBreakdown({ requests, range: parentRange }) {
   const [selected, setSelected] = React.useState(null) // { kind: 'project' | 'region', label: string }
-  const rows = requests.filter((q) => q.status === 'Entregue' && q.destination === 'Projeto')
+  const [period, setPeriod] = React.useState(() => parentRange || { start: '', end: '' })
+
+  React.useEffect(() => {
+    if (parentRange) setPeriod(parentRange)
+  }, [parentRange?.start, parentRange?.end])
+
+  const activeRange = period
+  const rows = React.useMemo(
+    () =>
+      requests.filter(
+        (q) =>
+          q.status === 'Entregue' &&
+          q.destination === 'Projeto' &&
+          !q.list_removed &&
+          within(q.closed_at || q.created_at, activeRange),
+      ),
+    [requests, activeRange],
+  )
   const cents = (q) => q.items.reduce((v, i) => v + i.qty * Math.round(Number(i.price) * 100), 0)
 
   const byProject = groupedEntries(rows, (q) => q.project, cents)
   const byRegion = groupedEntries(rows, (q) => regionOf(q.state), cents)
+
+  const consolidatedPeriodItems = React.useMemo(() => aggregateDeliveredItems(rows), [rows])
 
   function toggleSelection(kind, label) {
     setSelected((prev) => (prev?.kind === kind && prev?.label === label ? null : { kind, label }))
@@ -77,39 +124,40 @@ export function CostBreakdown({ requests }) {
         ? (q.project || 'Sem informação') === selected.label
         : (regionOf(q.state) || 'Sem informação') === selected.label,
     )
-    const aggregated = new Map()
-    for (const q of matchingRequests) {
-      for (const item of q.items || []) {
-        const matName = variant(item)
-        const key = `${q.project}|${q.state}|${item.material_id || matName}`
-        const cur = aggregated.get(key) || {
-          material: matName,
-          ca: item.ca || 'Sem CA',
-          project: q.project || '—',
-          state: q.state || '—',
-          employees: new Set(),
-          lastDate: q.closed_at || q.created_at,
-          qty: 0,
-          cents: 0,
-        }
-        if (q.employee) cur.employees.add(q.employee)
-        if ((q.closed_at || q.created_at) > cur.lastDate) cur.lastDate = q.closed_at || q.created_at
-        cur.qty += Number(item.qty || 0)
-        cur.cents += Number(item.qty || 0) * Math.round(Number(item.price || 0) * 100)
-        aggregated.set(key, cur)
-      }
-    }
-    return [...aggregated.values()].sort((a, b) => b.cents - a.cents)
+    return aggregateDeliveredItems(matchingRequests)
   }, [rows, selected])
 
   const detailTotalCents = detailItems.reduce((s, x) => s + x.cents, 0)
+
+  function handleExportPeriod() {
+    const bytes = buildDeliveredPeriodBytes(consolidatedPeriodItems, activeRange)
+    triggerXlsxDownload(bytes, `Itens_Enviados_Consolidado_SSMA_${today()}.xlsx`)
+  }
 
   return (
     <Panel
       title="Valor entregue por projeto e região"
       className="epi-cost-panel"
-      action={<small className="epi-click-hint">Clique em um projeto ou região para ver os materiais enviados</small>}
+      action={
+        <div className="epi-cost-toolbar">
+          <DateRange value={period} onChange={setPeriod} compact />
+          <button
+            type="button"
+            className="btn-green btn-compact"
+            onClick={handleExportPeriod}
+            disabled={!consolidatedPeriodItems.length}
+            title="Exportar de forma consolidada todos os itens enviados no período selecionado"
+          >
+            <FileSpreadsheet size={15} aria-hidden="true" />
+            <Download size={14} aria-hidden="true" /> Exportar itens enviados (.xlsx)
+          </button>
+        </div>
+      }
     >
+      <p className="epi-click-hint" style={{ margin: '0 0 10px' }}>
+        Clique em um projeto ou região para ver os materiais enviados · Utilize as datas acima para filtrar e exportar por período.
+      </p>
+
       <div className="epi-split">
         <Table
           headers={['Projeto', 'Valor']}
@@ -203,16 +251,16 @@ export function Consolidated({ data, db }) {
   React.useEffect(() => {
     let active = true
     setFailed(false)
-    db.rpc('ssma_epi_stock_costs').then(({ data, error }) => {
+    db.rpc('ssma_epi_stock_costs').then(({ data: resData, error }) => {
       if (active) {
         setFailed(Boolean(error))
-        setCosts(data || [])
+        setCosts(resData || [])
       }
     })
     return () => {
       active = false
     }
-  }, [db, retry])
+  }, [db, retry, data.requests])
 
   const parents = new Map()
   const normalize = (ca) => String(ca || '').trim().replace(/^0+(?=\d)/, '')
@@ -229,7 +277,6 @@ export function Consolidated({ data, db }) {
     return code
   }
 
-  const projectsByRegionId = new Map()
   const macroRegionsByRegionId = new Map()
   for (const r of data.regions || []) {
     const mr = regionOf(r.state)
@@ -237,10 +284,6 @@ export function Consolidated({ data, db }) {
   }
   for (const a of data.assignments || []) {
     if (a.active === false) continue
-    if (a.project) {
-      if (!projectsByRegionId.has(a.region_id)) projectsByRegionId.set(a.region_id, new Set())
-      projectsByRegionId.get(a.region_id).add(a.project)
-    }
     const mr = regionOf(a.state)
     if (mr) {
       if (!macroRegionsByRegionId.has(a.region_id)) macroRegionsByRegionId.set(a.region_id, new Set())
@@ -248,10 +291,6 @@ export function Consolidated({ data, db }) {
     }
   }
   for (const q of data.requests || []) {
-    if (q.project) {
-      if (!projectsByRegionId.has(q.region_id)) projectsByRegionId.set(q.region_id, new Set())
-      projectsByRegionId.get(q.region_id).add(q.project)
-    }
     const mr = regionOf(q.state)
     if (mr) {
       if (!macroRegionsByRegionId.has(q.region_id)) macroRegionsByRegionId.set(q.region_id, new Set())
@@ -266,7 +305,6 @@ export function Consolidated({ data, db }) {
     const g = groups.get(key) || {
       names: new Set(),
       aliases: new Set(),
-      projects: new Set(),
       regions: new Set(),
       ca,
       qty: 0,
@@ -279,24 +317,23 @@ export function Consolidated({ data, db }) {
     g.cents += m.qty * Math.round(Number(m.price) * 100)
 
     const regObj = (data.regions || []).find((r) => r.id === m.region_id)
-    const linkedProjects = projectsByRegionId.get(m.region_id)
-    if (linkedProjects?.size) {
-      for (const p of linkedProjects) g.projects.add(p)
-    } else if (regObj) {
-      g.projects.add(regionLabel(regObj))
-    }
-
     const linkedRegions = macroRegionsByRegionId.get(m.region_id)
     if (linkedRegions?.size) {
       for (const mr of linkedRegions) g.regions.add(mr)
     } else if (regObj?.state && regionOf(regObj.state)) {
       g.regions.add(regionOf(regObj.state))
+    } else if (regObj) {
+      g.regions.add(regionLabel(regObj))
     }
     groups.set(key, g)
   }
 
+  const groupedList = [...groups.values()]
+  const totalItemsQty = groupedList.reduce((s, g) => s + Number(g.qty || 0), 0)
+  const totalStockCents = groupedList.reduce((s, g) => s + Number(g.cents || 0), 0)
+
   const genericsByCa = new Map()
-  for (const g of groups.values()) {
+  for (const g of groupedList) {
     if (g.ca) genericsByCa.set(g.ca, [...g.aliases].join(', '))
   }
 
@@ -313,13 +350,12 @@ export function Consolidated({ data, db }) {
   }
 
   function handleExportConsolidated() {
-    const stockExportRows = [...groups.values()].map((g) => ({
+    const stockExportRows = groupedList.map((g) => ({
       material: [...g.names].join(' / '),
       ca: g.ca || 'Sem CA',
       generics: [...g.aliases].join(', ') || '—',
-      qty: g.qty,
-      project: [...g.projects].join(', ') || 'Estoque Geral',
       region: [...g.regions].join(', ') || 'Todas',
+      qty: g.qty,
     }))
 
     const deliveryExportRows = [...deliveries.values()].map((r) => ({
@@ -353,27 +389,64 @@ export function Consolidated({ data, db }) {
           </button>
         }
       >
+        <div className="epi-consolidated-totals" role="region" aria-label="Totais do estoque consolidado">
+          <div className="epi-consolidated-stat tone-green">
+            <Layers size={18} aria-hidden="true" />
+            <div>
+              <small>Número total dos itens</small>
+              <strong>{totalItemsQty.toLocaleString('pt-BR')}</strong>
+            </div>
+          </div>
+          <div className="epi-consolidated-stat tone-blue">
+            <Boxes size={18} aria-hidden="true" />
+            <div>
+              <small>Materiais / CAs consolidados</small>
+              <strong>{groupedList.length.toLocaleString('pt-BR')}</strong>
+            </div>
+          </div>
+          <div className="epi-consolidated-stat tone-neutral">
+            <Wallet size={18} aria-hidden="true" />
+            <div>
+              <small>Valor total em estoque</small>
+              <strong>{money(totalStockCents / 100)}</strong>
+            </div>
+          </div>
+        </div>
+
         <Table
           headers={[
             'Material',
             'CA principal',
             'CAs genéricos',
-            'Projeto',
             'Região',
             'Quantidade',
             'Valor médio unitário',
             'Valor total em estoque',
           ]}
-          rows={[...groups.values()].map((g) => [
-            <strong className="material-strong">{[...g.names].join(' / ')}</strong>,
-            <span className="ca-pill">{g.ca || 'Sem CA'}</span>,
-            [...g.aliases].join(', ') || '—',
-            [...g.projects].join(', ') || '—',
-            [...g.regions].join(', ') || '—',
-            <span className="num-cell">{g.qty}</span>,
-            <span className="num-cell">{g.qty ? money(g.cents / g.qty / 100) : '—'}</span>,
-            <span className={g.cents > 0 ? 'money-strong' : 'money-muted'}>{money(g.cents / 100)}</span>,
-          ])}
+          rows={[
+            ...groupedList.map((g) => [
+              <strong className="material-strong">{[...g.names].join(' / ')}</strong>,
+              <span className="ca-pill">{g.ca || 'Sem CA'}</span>,
+              [...g.aliases].join(', ') || '—',
+              [...g.regions].join(', ') || '—',
+              <span className="num-cell">{g.qty.toLocaleString('pt-BR')}</span>,
+              <span className="num-cell">{g.qty ? money(g.cents / g.qty / 100) : '—'}</span>,
+              <span className={g.cents > 0 ? 'money-strong' : 'money-muted'}>{money(g.cents / 100)}</span>,
+            ]),
+            ...(groupedList.length > 0
+              ? [
+                  [
+                    <strong className="epi-consolidated-total-label">Total geral dos itens</strong>,
+                    '',
+                    '',
+                    `${groupedList.length} material(is)`,
+                    <strong className="num-cell epi-consolidated-total-num">{totalItemsQty.toLocaleString('pt-BR')}</strong>,
+                    '—',
+                    <strong className="money-strong epi-consolidated-total-num">{money(totalStockCents / 100)}</strong>,
+                  ],
+                ]
+              : []),
+          ]}
         />
       </Panel>
       <Panel title="Distribuição por projeto e região">

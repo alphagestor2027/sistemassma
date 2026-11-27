@@ -138,19 +138,24 @@ function RequestItemsEditor({ request, materials, onSave, onCancel }) {
     Object.fromEntries(request.complete.map((i) => [i.material_id, String(i.qty)])),
   )
   const [removedIds, setRemovedIds] = useState([])
+  const [addedItems, setAddedItems] = useState([])
+  const [addMatId, setAddMatId] = useState('')
+  const [addQty, setAddQty] = useState('1')
+  const [addReason, setAddReason] = useState('Inicial')
   const [note, setNote] = useState(request.management_note || '')
   const [postal, setPostal] = useState(request.postal || '')
   const [busy, setBusy] = useState(false)
   const [err, setErr] = useState('')
 
   const keptCount = request.complete.filter((i) => !removedIds.includes(i.material_id)).length
+  const unitMaterials = materials.filter((m) => m.region_id === request.region_id && available(m) > 0)
 
   function toggleRemoveItem(materialId) {
     setErr('')
     if (removedIds.includes(materialId)) {
       setRemovedIds((prev) => prev.filter((id) => id !== materialId))
     } else {
-      if (keptCount <= 1) {
+      if (keptCount + addedItems.length <= 1) {
         setErr(
           'A ficha precisa manter ao menos 1 item. Para retirar todos os itens e estorná-los ao estoque, clique no botão "Remover" da solicitação.',
         )
@@ -158,6 +163,34 @@ function RequestItemsEditor({ request, materials, onSave, onCancel }) {
       }
       setRemovedIds((prev) => [...prev, materialId])
     }
+  }
+
+  function handleAddMaterial() {
+    setErr('')
+    if (!addMatId) {
+      setErr('Selecione um material disponível para adicionar.')
+      return
+    }
+    const qVal = Number(addQty)
+    if (!Number.isInteger(qVal) || qVal < 1) {
+      setErr('Informe uma quantidade inteira válida (mínimo 1) para incluir o item.')
+      return
+    }
+    const mat = unitMaterials.find((m) => m.id === addMatId)
+    if (!mat) return
+    if (qVal > available(mat)) {
+      setErr(`Saldo insuficiente para ${variant(mat)}. Disponível: ${available(mat)}.`)
+      return
+    }
+    setAddedItems((prev) => {
+      const existing = prev.find((x) => x.id === addMatId)
+      if (existing) {
+        return prev.map((x) => (x.id === addMatId ? { ...x, qty: x.qty + qVal } : x))
+      }
+      return [...prev, { id: mat.id, name: variant(mat), qty: qVal, reason: addReason }]
+    })
+    setAddMatId('')
+    setAddQty('1')
   }
 
   async function handleSubmit(e) {
@@ -185,6 +218,7 @@ function RequestItemsEditor({ request, materials, onSave, onCancel }) {
         previous_qty: Object.fromEntries(request.complete.map((i) => [i.material_id, i.qty])),
         quantities: parsedQuantities,
         removed_materials: removedIds,
+        added_materials: addedItems.map(({ id, qty, reason }) => ({ id, qty, reason })),
       })
       onCancel()
     } catch (error) {
@@ -196,7 +230,7 @@ function RequestItemsEditor({ request, materials, onSave, onCancel }) {
 
   return (
     <form className="epi-request-edit-box" onSubmit={handleSubmit}>
-      <StockImpactNotice context="editada ou tiver itens alterados ou excluídos" />
+      <StockImpactNotice context="editada ou tiver itens alterados, incluídos ou excluídos" />
 
       <div className="epi-edit-items-list">
         <h4>Itens da ficha / solicitação</h4>
@@ -260,7 +294,59 @@ function RequestItemsEditor({ request, materials, onSave, onCancel }) {
             </div>
           )
         })}
+
+        {addedItems.map((added) => (
+          <div key={'add-' + added.id} className="epi-edit-item-row">
+            <div className="epi-edit-item-info">
+              <strong>+ {added.name}</strong>
+              <small>
+                Novo item · Qtd.: {added.qty} · {added.reason}
+                <span className="epi-stock-delta consume"> (-{added.qty} sai do estoque)</span>
+              </small>
+            </div>
+            <button
+              type="button"
+              disabled={busy}
+              className="btn-soft-danger btn-sm"
+              onClick={() => setAddedItems((prev) => prev.filter((x) => x.id !== added.id))}
+            >
+              <Trash2 size={13} aria-hidden="true" /> Retirar inclusão
+            </button>
+          </div>
+        ))}
       </div>
+
+      {unitMaterials.length > 0 && (
+        <div className="epi-add-item-box">
+          <strong>Incluir novo item nesta ficha</strong>
+          <div className="epi-filters">
+            <Select
+              label="Material disponível"
+              placeholder="Selecione um material"
+              value={addMatId}
+              onChange={(e) => setAddMatId(e.target.value)}
+              options={unitMaterials.map((m) => [m.id, `${variant(m)} (${available(m)} disp.)`])}
+            />
+            <Field
+              label="Qtd."
+              type="number"
+              min={1}
+              step={1}
+              value={addQty}
+              onChange={(e) => setAddQty(e.target.value)}
+            />
+            <Select
+              label="Motivo"
+              value={addReason}
+              onChange={(e) => setAddReason(e.target.value)}
+              options={['Inicial', 'Substituição por perda ou roubo', 'Substituição por período de troca/desgaste']}
+            />
+            <button type="button" className="secondary btn-sm" disabled={busy} onClick={handleAddMaterial}>
+              Incluir item
+            </button>
+          </div>
+        </div>
+      )}
 
       <div className="epi-filters" style={{ marginTop: 10 }}>
         <Field
@@ -397,11 +483,11 @@ export function Requests({ data, profile, save, refresh, initialFocus, onSheet, 
       }
     >
       {action === 'clear' && (
-        <ActionForm submit="Confirmar limpeza" onSave={() => save('clear_requests', {})} onDone={() => setAction('')}>
-          <StockImpactNotice context="limpa com reservas abertas" />
+        <ActionForm submit="Confirmar limpeza e estornar estoque" onSave={() => save('clear_requests', {})} onDone={() => setAction('')}>
+          <StockImpactNotice context="removida ou limpa da listagem" />
           <p>
-            Remover todas as solicitações da listagem? As reservas pendentes voltarão imediatamente ao saldo disponível
-            do estoque.
+            Remover todas as solicitações e fichas listadas? Todas as unidades entregues ou reservadas retornarão
+            imediatamente ao saldo do estoque e as despesas financeiras vinculadas serão estornadas.
           </p>
           <button type="button" className="secondary" onClick={() => setAction('')}>
             Voltar
@@ -660,7 +746,7 @@ export function Finance({ data, children }) {
       </Panel>
       <div className="epi-finance-middle">
         {children}
-        <CostBreakdown requests={data.requests.filter((q) => within(q.closed_at, range))} />
+        <CostBreakdown requests={data.requests} range={range} />
       </div>
       <Panel title="Extrato de entradas e saídas">
         <Table

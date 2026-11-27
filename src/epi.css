@@ -2084,3 +2084,113 @@ button.stock-log-pill {
     padding: 0 !important;
   }
 }
+
+/* ─── Consolidated Totals Strip, Cost Toolbar & Add Item Editor ─── */
+.epi-consolidated-totals {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 12px;
+  margin-bottom: 16px;
+}
+.epi-consolidated-stat {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 13px 16px;
+  border-radius: 12px;
+  border: 1px solid #e2e8f0;
+  background: #f8fafc;
+}
+.epi-consolidated-stat.tone-green {
+  background: #f0fdf4;
+  border-color: #bbf7d0;
+  color: #166534;
+}
+.epi-consolidated-stat.tone-blue {
+  background: #eff6ff;
+  border-color: #bfdbfe;
+  color: #1e40af;
+}
+.epi-consolidated-stat svg {
+  flex-shrink: 0;
+}
+.epi-consolidated-stat small {
+  display: block;
+  font-size: 12px;
+  font-weight: 600;
+  opacity: 0.85;
+}
+.epi-consolidated-stat strong {
+  display: block;
+  font-size: 20px;
+  font-weight: 800;
+  line-height: 1.2;
+}
+.epi-consolidated-total-label {
+  color: #14532d;
+  font-weight: 800;
+}
+.epi-consolidated-total-num {
+  color: #14532d;
+  font-size: 14.5px;
+}
+
+.epi-cost-toolbar {
+  display: flex;
+  align-items: flex-end;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.epi-cost-panel header {
+  flex-wrap: wrap;
+  gap: 12px;
+}
+
+.epi-add-item-box {
+  margin-top: 6px;
+  padding: 12px 14px;
+  border-radius: 10px;
+  border: 1px dashed #cbd5e1;
+  background: #ffffff;
+  display: grid;
+  gap: 8px;
+}
+.epi-add-item-box > strong {
+  font-size: 13px;
+  color: #0f172a;
+}
+
+@media screen {
+  [data-theme="dark"] .epi-consolidated-stat {
+    background: #161b23;
+    border-color: #2d3643;
+    color: #e2e8f0;
+  }
+  [data-theme="dark"] .epi-consolidated-stat.tone-green {
+    background: rgba(21, 128, 61, 0.16);
+    border-color: rgba(74, 222, 128, 0.35);
+    color: #86efac;
+  }
+  [data-theme="dark"] .epi-consolidated-stat.tone-blue {
+    background: rgba(37, 99, 235, 0.16);
+    border-color: rgba(96, 165, 250, 0.35);
+    color: #93c5fd;
+  }
+  [data-theme="dark"] .epi-consolidated-total-label,
+  [data-theme="dark"] .epi-consolidated-total-num {
+    color: #86efac;
+  }
+  [data-theme="dark"] .epi-add-item-box {
+    background: #1c222b;
+    border-color: #3a4659;
+  }
+  [data-theme="dark"] .epi-add-item-box > strong {
+    color: #f1f5f9;
+  }
+}
+
+@media (max-width: 900px) {
+  .epi-consolidated-totals {
+    grid-template-columns: 1fr;
+  }
+}

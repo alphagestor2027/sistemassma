@@ -5,6 +5,7 @@ import { epiFixture, applyDistributionUnits, applySheetDistribution, applyTechni
 import {
   buildStockTemplateBytes,
   buildConsolidatedStockBytes,
+  buildDeliveredPeriodBytes,
   parseStockSpreadsheet,
 } from '../src/spreadsheet.js'
 import { resolveCepLocation, formatCep } from '../src/cepRegion.js'
@@ -61,9 +62,15 @@ test('template .xlsx verde e planilha consolidada preservam estilos, cabeçalhos
         material: 'BOTINA DE SEGURANÇA',
         ca: '43210',
         generics: '43211, 43212',
-        qty: 12,
-        project: 'Projeto Norte',
         region: 'Centro-Oeste',
+        qty: 12,
+      },
+      {
+        material: 'CAPACETE',
+        ca: '12345',
+        generics: '—',
+        region: 'Nordeste',
+        qty: 8,
       },
     ],
     [
@@ -80,8 +87,31 @@ test('template .xlsx verde e planilha consolidada preservam estilos, cabeçalhos
   const consolidatedXml = new TextDecoder().decode(consolidatedBytes)
   assert.match(consolidatedXml, /CA Principal/)
   assert.match(consolidatedXml, /CA Genérico/)
-  assert.match(consolidatedXml, /Projeto Norte/)
+  assert.match(consolidatedXml, /TOTAL GERAL DE ITENS/)
+  assert.match(consolidatedXml, /20 item\(ns\) no total/)
   assert.match(consolidatedXml, /Centro-Oeste/)
+  assert.match(consolidatedXml, /Projeto Norte/)
+
+  const deliveredPeriodBytes = buildDeliveredPeriodBytes(
+    [
+      {
+        project: 'DATAPREV-DF',
+        region: 'Centro-Oeste',
+        state: 'DF',
+        material: 'BOTINA DE SEGURANÇA',
+        ca: '43210',
+        qty: 2,
+        cents: 29400,
+      },
+    ],
+    { start: '2026-11-01', end: '2026-11-30' },
+  )
+  const deliveredPeriodXml = new TextDecoder().decode(deliveredPeriodBytes)
+  assert.match(deliveredPeriodXml, /ITENS ENVIADOS POR PROJETO E REGIÃO \(CONSOLIDADO\)/)
+  assert.match(deliveredPeriodXml, /01\/11\/2026 a 30\/11\/2026/)
+  assert.match(deliveredPeriodXml, /DATAPREV-DF/)
+  assert.match(deliveredPeriodXml, /Por projeto/)
+  assert.match(deliveredPeriodXml, /Por região/)
 })
 
 test('localizador de CEP identifica UF e macrorregião em todas as 5 regiões do Brasil', () => {
@@ -383,6 +413,103 @@ test('importação de estoque via planilha: isolamento por técnico, atualizaç�
     })
     wsAfterReq = await call(tech, 'ssma_epi_workspace')
     assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 15)
+
+    // 4e. Inclusão de novo item via edit_request + sincronização total ao usar clear_requests em fichas entregues
+    const clearTestReqId = randomUUID()
+    await call(null, 'ssma_epi_portal', {
+      action: 'submit',
+      p: {
+        employee_id: employee,
+        id: clearTestReqId,
+        items: [{ id: updatedBoot.id, qty: 2 }],
+      },
+    })
+    await manage(tech, 'progress', {
+      request_id: clearTestReqId,
+      stage: 'Concluída',
+      previous_stage: 'Solicitações recebidas',
+      previous_postal: '',
+      postal: '',
+    })
+    // Inclui Óculos (qty 3) na solicitação já entregue via edit_request
+    await manage(tech, 'edit_request', {
+      request_id: clearTestReqId,
+      status: 'Entregue',
+      note: 'Inclusão via edição',
+      postal: '',
+      quantities: { [updatedBoot.id]: 2 },
+      removed_materials: [],
+      added_materials: [{ id: goggles.id, qty: 3, reason: 'Inicial' }],
+    })
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 13)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 27)
+    assert.equal((await call(tech, 'ssma_epi_stock_costs')).length, 2)
+
+    // Limpar solicitações agora devolve TUDO ao estoque e limpa movimentos/financeiro!
+    await manage(tech, 'clear_requests', {})
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 15)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 30)
+    assert.equal(wsAfterReq.requests.length, 0)
+    assert.equal(
+      wsAfterReq.movements.filter((v) => v.kind === 'Saída').length,
+      0,
+      'Movimentações de saída devem ser estornadas após limpar/remover fichas',
+    )
+    assert.deepEqual(await call(tech, 'ssma_epi_stock_costs'), [])
+    assert.deepEqual(await call(tech, 'ssma_epi_dashboard'), [])
+
+    // 4f. Testa edição adicionando novo item via ssma_epi_sheet('edit') + exclusão de ficha legada sem request_id
+    const sheetCtx2 = await call(tech, 'ssma_epi_sheet', {
+      action: 'context',
+      p: { employee_id: employee },
+    })
+    const docId2 = randomUUID()
+    const issued2 = await call(tech, 'ssma_epi_sheet', {
+      action: 'issue',
+      p: {
+        id: docId2,
+        employee_id: employee,
+        version: sheetCtx2.version,
+        new_items: [{ id: updatedBoot.id, qty: 2, reason: 'Inicial' }],
+        settings: {
+          identity: { name: 'Ana Silva', unit: 'Projeto Norte' },
+          legal: 'Legal',
+          term: 'Termo',
+          logo: '',
+          place: 'Brasília',
+          reasons: {},
+        },
+      },
+    })
+    // Adiciona Óculos via document_items durante edição da ficha
+    const edited2 = await call(tech, 'ssma_epi_sheet', {
+      action: 'edit',
+      p: {
+        id: docId2,
+        employee_id: employee,
+        revision: issued2.revision,
+        removed: [],
+        item_quantities: { [`${docId2}/${updatedBoot.id}`]: 2 },
+        document_items: [{ id: goggles.id, qty: 4, reason: 'Inicial' }],
+        settings: issued2.settings,
+      },
+    })
+    assert.equal(edited2.snapshot.items.length, 2)
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 13)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 26)
+
+    // Exclui ficha -> tudo retorna ao saldo original (15 e 30)
+    await call(tech, 'ssma_epi_sheet', {
+      action: 'delete',
+      p: { id: docId2, employee_id: employee, revision: edited2.revision },
+    })
+    wsAfterReq = await call(tech, 'ssma_epi_workspace')
+    assert.equal(wsAfterReq.materials.find((m) => m.id === updatedBoot.id).qty, 15)
+    assert.equal(wsAfterReq.materials.find((m) => m.id === goggles.id).qty, 30)
+    assert.deepEqual(await call(tech, 'ssma_epi_stock_costs'), [])
 
     // 5. Correios: CEP identificando UF, tipo Colaborador / Fornecedor / Outros e decisão de custo no projeto
     const logistics = (actor, action, p) => call(actor, 'ssma_epi_logistics', { action, p })
